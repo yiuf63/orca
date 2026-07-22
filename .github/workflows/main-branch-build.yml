@@ -1,0 +1,60 @@
+name: Main Branch Build
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-branch-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install native build tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential python3 zlib1g-dev zsh
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      # Why: pnpm's bundled node-gyp ships gyp_main.py without execute
+      # permission, which breaks native module builds on Linux runners.
+      - name: Use external node-gyp to avoid pnpm's bundled copy (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          npm install -g node-gyp@11.5.0
+          echo "npm_config_node_gyp=$(npm root -g)/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
+
+      - name: Prepare dependency install
+        run: |
+          if [ -e node_modules ]; then
+            ls -ld node_modules
+            rm -rf node_modules
+          fi
+
+      - name: Install dependencies
+        run: |
+          pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false
+          git diff --exit-code package.json pnpm-lock.yaml
+
+      - name: Build
+        run: pnpm build
