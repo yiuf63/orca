@@ -36,7 +36,8 @@ vi.mock('../ai-vault/session-scanner-claude-subagents', () => ({
 
 vi.mock('../wsl', () => ({
   getWslHomeAsync: mocks.getAiVaultWslHomeDirs,
-  listWslDistrosAsync: vi.fn().mockResolvedValue([])
+  listWslDistrosAsync: vi.fn().mockResolvedValue([]),
+  listRunningWslDistrosAsync: vi.fn().mockResolvedValue([])
 }))
 
 vi.mock('../providers/ssh-filesystem-dispatch', () => ({

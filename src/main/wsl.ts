@@ -168,6 +168,19 @@ export async function listWslDistrosAsync(): Promise<string[]> {
   }
 }
 
+export async function listRunningWslDistrosAsync(): Promise<string[]> {
+  if (process.platform !== 'win32') {
+    return []
+  }
+
+  try {
+    const output = await execFileUtf8('wsl.exe', ['--list', '--running', '--quiet'])
+    return normalizeWslListOutput(output).filter(isUserWslDistro)
+  } catch {
+    return []
+  }
+}
+
 export function hasCachedWslDistros(): boolean {
   return wslDistroCache !== null
 }
@@ -212,9 +225,19 @@ export function getWslHome(distro: string): string | null {
   }
 }
 
-export async function getWslHomeAsync(distro: string): Promise<string | null> {
+export async function getWslHomeAsync(
+  distro: string,
+  options?: { onlyIfRunning?: boolean }
+): Promise<string | null> {
   if (wslHomeCache.has(distro)) {
     return wslHomeCache.get(distro)!
+  }
+
+  if (options?.onlyIfRunning) {
+    const running = await listRunningWslDistrosAsync()
+    if (!running.includes(distro)) {
+      return null
+    }
   }
 
   try {

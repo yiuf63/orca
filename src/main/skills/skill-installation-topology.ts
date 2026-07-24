@@ -28,9 +28,10 @@ export function normalizedSkillIdentityPath(value: string): string {
 
 export function skillPhysicalIdentity(
   resolvedPath: string,
-  fileStat: Awaited<ReturnType<typeof stat>>
+  fileStat?: Awaited<ReturnType<typeof stat>>
 ): string {
-  const inodeIdentity = fileStat.dev || fileStat.ino ? `${fileStat.dev}:${fileStat.ino}` : null
+  const inodeIdentity =
+    fileStat && (fileStat.dev || fileStat.ino) ? `${fileStat.dev}:${fileStat.ino}` : null
   return inodeIdentity ?? normalizedSkillIdentityPath(resolvedPath)
 }
 
