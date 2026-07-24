@@ -7,9 +7,9 @@ import { SettingsSubsectionHeader, SettingsSwitchRow } from './SettingsFormContr
 import { SearchableSetting } from './SearchableSetting'
 import { matchesSettingsSearch } from './settings-search'
 import { getTerminalRightClickToPasteSearchEntry } from './terminal-windows-search'
-import { OSC52_CLIPBOARD_SETTING_ID } from '../terminal-pane/osc52-clipboard-setting-anchor'
 import { isMacPlatform } from '../terminal-pane/terminal-link-open-hints'
 import { translate } from '@/i18n/i18n'
+import { TerminalOsc52Settings } from './TerminalOsc52Settings'
 import {
   DEFAULT_TERMINAL_FAST_SCROLL_SENSITIVITY,
   DEFAULT_TERMINAL_SCROLL_SENSITIVITY,
@@ -332,48 +332,7 @@ export function TerminalInteractionSection({
           />
         </SearchableSetting>
 
-        <SearchableSetting
-          id={OSC52_CLIPBOARD_SETTING_ID}
-          title={translate(
-            'auto.components.settings.TerminalPane.3338dcf8c1',
-            'Allow TUI Clipboard Writes (OSC 52)'
-          )}
-          description={translate(
-            'auto.components.settings.TerminalPane.69c64a479c',
-            'Let Grok, tmux, Neovim, and fzf copy to the system clipboard over the PTY (including over SSH).'
-          )}
-          keywords={[
-            'osc 52',
-            'osc52',
-            'clipboard',
-            'tmux',
-            'neovim',
-            'nvim',
-            'fzf',
-            'grok',
-            'ssh',
-            'remote',
-            'copy',
-            'paste'
-          ]}
-        >
-          <SettingsSwitchRow
-            label={translate(
-              'auto.components.settings.TerminalPane.3338dcf8c1',
-              'Allow TUI Clipboard Writes (OSC 52)'
-            )}
-            description={translate(
-              'auto.components.settings.TerminalPane.6e6480a7df',
-              'Let programs in the terminal (Grok, tmux, Neovim, fzf, SSH) copy to your system clipboard.'
-            )}
-            checked={settings.terminalAllowOsc52Clipboard}
-            onChange={() =>
-              updateSettings({
-                terminalAllowOsc52Clipboard: !settings.terminalAllowOsc52Clipboard
-              })
-            }
-          />
-        </SearchableSetting>
+        <TerminalOsc52Settings settings={settings} updateSettings={updateSettings} />
       </div>
     </section>
   )

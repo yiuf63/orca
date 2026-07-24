@@ -2722,8 +2722,10 @@ export type GlobalSettings = {
   terminalFocusFollowsMouse: boolean
   /** X11/gnome-terminal "copy on select": selecting text auto-copies to the clipboard; default off. */
   terminalClipboardOnSelect: boolean
-  /** Enables OSC 52 clipboard writes for TUIs (SSH clipboard bridge); default off since OSC 52 is a clipboard-exfiltration vector. */
+  /** Enables OSC 52 clipboard writes for TUIs (SSH clipboard bridge); default off to prevent silent clipboard replacement. */
   terminalAllowOsc52Clipboard: boolean
+  /** Enables focused active-pane OSC 52 clipboard queries; independently opt-in because reads can exfiltrate clipboard data. */
+  terminalAllowOsc52ClipboardRead?: boolean
   /** Experimental Claude Agent Teams; native panes use a tmux-compatible shim so teammate output stays on the normal PTY path. */
   claudeAgentTeamsMode?: ClaudeAgentTeamsMode
   /** Where the repo setup script runs on workspace create; defaults to a background "Setup" tab to keep the main terminal usable. */

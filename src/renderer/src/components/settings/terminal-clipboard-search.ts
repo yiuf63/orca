@@ -110,5 +110,37 @@ export const getTerminalClipboardSearchEntries = createLocalizedCatalog(() => [
         'paste'
       )
     ]
+  },
+  {
+    title: translate(
+      'auto.components.settings.terminal.clipboard.search.24d8b6c3a1',
+      'Allow TUI Clipboard Reads (OSC 52)'
+    ),
+    description: translate(
+      'auto.components.settings.terminal.clipboard.search.f1e7a09b42',
+      'Let the focused active terminal read clipboard text through OSC 52, including over SSH.'
+    ),
+    keywords: [
+      ...translateSearchKeyword(
+        'auto.components.settings.terminal.clipboard.search.62d1208b90',
+        'osc 52'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.terminal.clipboard.search.9dfc125cd3',
+        'osc52'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.terminal.clipboard.search.10d73e22d3',
+        'clipboard'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.terminal.clipboard.search.043b32faa1',
+        'ssh'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.terminal.clipboard.search.d106f44fb4',
+        'remote'
+      )
+    ]
   }
 ])

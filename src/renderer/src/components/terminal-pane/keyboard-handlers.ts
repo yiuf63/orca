@@ -495,6 +495,21 @@ export function useTerminalKeyboardShortcuts({
         return
       }
 
+      if (action.type === 'navigateCommand') {
+        const pane = manager.getActivePane() ?? manager.getPanes()[0]
+        if (!pane) {
+          return
+        }
+        if (!manager.navigatePaneCommand(pane.id, action.direction)) {
+          return
+        }
+        markTerminalPinnedViewport(pane.terminal)
+        e.preventDefault()
+        e.stopImmediatePropagation()
+        syncTerminalScrollIntentFromViewport(pane.terminal)
+        return
+      }
+
       // Cmd+[ / Cmd+] cycles active split pane focus.
       if (action.type === 'focusPane') {
         const panes = manager.getPanes()

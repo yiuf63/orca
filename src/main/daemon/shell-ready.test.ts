@@ -488,6 +488,7 @@ describePosix('daemon shell-ready launch config', () => {
     const bashRc = readFileSync(join(userDataPath, 'shell-ready', 'bash', 'rcfile'), 'utf8')
 
     expect(bashRc).toContain('printf "\\033]133;D;%s\\007"')
+    expect(bashRc).toContain('printf "\\033]133;B\\007"')
     expect(bashRc).toContain('printf "\\033]133;C\\007"')
     // precmd is prepended (captures $? first), epilogue appended last, so a framework needing last position stays between them.
     expect(bashRc).toContain(
@@ -498,6 +499,7 @@ describePosix('daemon shell-ready launch config', () => {
       bashRc.indexOf('PROMPT_COMMAND="__orca_osc133_precmd')
     )
     expect(zshrc).toContain('printf "\\033]133;D;%s\\007"')
+    expect(zshrc).toContain('printf "\\033]133;B\\007"')
     expect(zshrc).toContain('printf "\\033]133;C\\007"')
   })
 

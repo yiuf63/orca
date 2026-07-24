@@ -9,6 +9,7 @@ import { guardParserHandler } from './terminal-parser-handler-guard'
 
 export const DEFAULT_DA1_RESPONSE = '\x1b[?1;2c'
 export const CONPTY_DA1_RESPONSE = '\x1b[?61;4c'
+export const INLINE_IMAGE_DA1_RESPONSE = '\x1b[?62;4;9;22c'
 
 type TerminalCapabilityRepliesDeps = {
   terminal: Pick<Terminal, 'cols' | 'rows' | 'element' | 'options'>
@@ -81,11 +82,16 @@ export function createTerminalPixelSizeQueryResponder(
   sendInput: (data: string) => boolean | void
 ): (data: string) => void {
   let pending = ''
-  const respond = (reportsWindowPixels: boolean): void => {
+  const respond = (report: 'window-pixels' | 'cell-pixels' | 'window-characters'): void => {
+    if (report === 'window-characters') {
+      sendInput(`\x1b[8;${terminal.rows};${terminal.cols}t`)
+      return
+    }
     const cell = measureCellPixels(terminal)
     if (!cell) {
       return
     }
+    const reportsWindowPixels = report === 'window-pixels'
     const width = cell.width * (reportsWindowPixels ? terminal.cols : 1)
     const height = cell.height * (reportsWindowPixels ? terminal.rows : 1)
     sendInput(`\x1b[${reportsWindowPixels ? 4 : 6};${height};${width}t`)
@@ -101,12 +107,17 @@ export function createTerminalPixelSizeQueryResponder(
       }
       const query = input.slice(queryIndex, queryIndex + 5)
       if (query === '\x1b[14t') {
-        respond(true)
+        respond('window-pixels')
         offset = queryIndex + 5
         continue
       }
       if (query === '\x1b[16t') {
-        respond(false)
+        respond('cell-pixels')
+        offset = queryIndex + 5
+        continue
+      }
+      if (query === '\x1b[18t') {
+        respond('window-characters')
         offset = queryIndex + 5
         continue
       }

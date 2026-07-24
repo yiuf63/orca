@@ -804,13 +804,24 @@ export function useTerminalPaneLifecycle({
 
         // OSC 52 — TUI-initiated clipboard writes (tmux/nvim/fzf/ssh).
         // Why: read settingsRef at fire time so mid-session gate toggles apply; return true in both paths so xterm doesn't fall through.
+        const canReadOsc52Clipboard = (): boolean =>
+          settingsRef.current?.terminalAllowOsc52ClipboardRead === true &&
+          isActiveRef.current &&
+          document.hasFocus() &&
+          manager.getActivePane()?.id === pane.id &&
+          !isPaneReplaying(replayingPanesRef, pane.id)
         const osc52Disposable = pane.terminal.parser.registerOscHandler(
           52,
           guardParserHandler('osc-52-clipboard', (data) =>
             handleOsc52ClipboardRequest(data, {
               allowClipboardWrite: settingsRef.current?.terminalAllowOsc52Clipboard === true,
               writeClipboardText: window.api.ui.writeClipboardText,
-              onBlockedWrite: showOsc52ClipboardBlockedToast
+              onBlockedWrite: showOsc52ClipboardBlockedToast,
+              allowClipboardRead: canReadOsc52Clipboard(),
+              readClipboardText: window.api.ui.readClipboardText,
+              canSendClipboardReadReply: canReadOsc52Clipboard,
+              sendInput: (reply) =>
+                paneTransportsRef.current.get(pane.id)?.sendInputImmediate(reply) === true
             })
           )
         )

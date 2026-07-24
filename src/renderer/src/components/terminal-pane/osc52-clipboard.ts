@@ -9,23 +9,26 @@
 //
 // Pc is one or more selection-kind letters ("c"=clipboard, "p"=primary,
 // "q"=secondary, "s"=select); Pd is base64-encoded UTF-8. If Pd is "?" the
-// TUI is *querying* the clipboard — we deliberately ignore that case to
-// avoid leaking clipboard contents to any process writing to the PTY.
+// TUI is *querying* the clipboard. Reads use a separate, stricter opt-in and
+// should only be allowed for the focused active pane.
 //
-// Safety: OSC 52 is a classic data-exfil / overwrite vector — piping an
-// attacker-controlled log into the terminal could silently replace the
-// user's clipboard. Callers must gate on the user-opt-in setting
-// `terminalAllowOsc52Clipboard` before invoking the handler.
+// Safety: OSC 52 is a classic clipboard overwrite / exfiltration vector.
+// Writes and reads must remain independently opt-in; reads additionally need
+// focused active-pane checks at request and reply time.
 
 export type Osc52ParseResult =
   | { kind: 'write'; selections: string; text: string }
-  | { kind: 'query' }
+  | { kind: 'query'; selections: string }
   | { kind: 'invalid'; reason: string }
 
 export type Osc52ClipboardRequestOptions = {
   allowClipboardWrite: boolean
   writeClipboardText: (text: string) => Promise<void>
   onBlockedWrite?: () => void
+  allowClipboardRead?: boolean
+  readClipboardText?: (options: { maxBytes: number }) => Promise<string>
+  sendInput?: (data: string) => boolean | void
+  canSendClipboardReadReply?: () => boolean
 }
 
 const MAX_OSC52_BYTES = 128 * 1024
@@ -35,6 +38,23 @@ export function handleOsc52ClipboardRequest(
   options: Osc52ClipboardRequestOptions
 ): boolean {
   const parsed = parseOsc52(data)
+  if (parsed.kind === 'query') {
+    if (!options.allowClipboardRead || !options.readClipboardText || !options.sendInput) {
+      return true
+    }
+    void options
+      .readClipboardText({ maxBytes: MAX_OSC52_BYTES })
+      .then((text) => {
+        if (options.canSendClipboardReadReply?.() === false) {
+          return
+        }
+        options.sendInput?.(`\x1b]52;${parsed.selections};${encodeBase64Utf8(text)}\x07`)
+      })
+      .catch(() => {
+        /* ignore clipboard read failures */
+      })
+    return true
+  }
   if (parsed.kind !== 'write') {
     return true
   }
@@ -70,7 +90,7 @@ export function parseOsc52(data: string): Osc52ParseResult {
   }
 
   if (payload === '?') {
-    return { kind: 'query' }
+    return { kind: 'query', selections }
   }
 
   // Why guard size: xterm's own parser caps OSC payloads at ~10 MB; we cap
@@ -85,6 +105,16 @@ export function parseOsc52(data: string): Osc52ParseResult {
     return { kind: 'invalid', reason: 'payload is not valid base64' }
   }
   return { kind: 'write', selections, text: decoded }
+}
+
+function encodeBase64Utf8(value: string): string {
+  const bytes = new TextEncoder().encode(value)
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))
+  }
+  return btoa(binary)
 }
 
 function decodeBase64Utf8(b64: string): string | null {

@@ -2,6 +2,7 @@ import type { IDisposable, IMarker, Terminal } from '@xterm/xterm'
 import type { ITerminalOptions } from '@xterm/xterm'
 import type { FitAddon } from '@xterm/addon-fit'
 import type { LigaturesAddon } from '@xterm/addon-ligatures'
+import type { ImageAddon } from '@xterm/addon-image'
 import type { SearchAddon } from '@xterm/addon-search'
 import type { Unicode11Addon } from '@xterm/addon-unicode11'
 import type { WebLinksAddon } from '@xterm/addon-web-links'
@@ -10,6 +11,7 @@ import type { SerializeAddon } from '@xterm/addon-serialize'
 import type { GlobalSettings } from '../../../../shared/types'
 import type { TerminalLeafId } from '../../../../shared/stable-pane-id'
 import type { TerminalWebglAutoDecision } from './terminal-webgl-auto-policy'
+import type { TerminalOsc133CommandTracker } from './terminal-osc133-command-tracker'
 
 // ---------------------------------------------------------------------------
 // Public interfaces
@@ -144,6 +146,10 @@ export type ManagedPaneInternal = {
   // so the addon instance only exists while the feature is active. A null
   // value means "currently disabled".
   ligaturesAddon: LigaturesAddon | null
+  imageAddon?: ImageAddon | null
+  imageResidueScrubberDisposable?: IDisposable | null
+  hasInlineImages?: boolean
+  osc133CommandTracker?: TerminalOsc133CommandTracker | null
   fitResizeObserver: ResizeObserver | null
   // Why: fit-element pixel size at the last successful fit; the reveal fit compares
   // against it to tell a real hidden-time resize from a transient cell-metric wobble.

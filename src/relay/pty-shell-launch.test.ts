@@ -165,6 +165,7 @@ describe('getRelayShellLaunchConfig', () => {
       expect(config.args).toEqual(['--rcfile', rcfile])
       expect(config.env).toEqual({})
       expect(bashRc).toContain('printf "\\033]133;D;%s\\007"')
+      expect(bashRc).toContain('printf "\\033]133;B\\007"')
       expect(bashRc).toContain('printf "\\033]133;C\\007"')
     }
   )

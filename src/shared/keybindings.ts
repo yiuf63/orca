@@ -102,6 +102,8 @@ export type KeybindingActionId =
   | 'terminal.paste'
   | 'terminal.search'
   | 'terminal.clear'
+  | 'terminal.previousCommand'
+  | 'terminal.nextCommand'
   | 'terminal.focusNextPane'
   | 'terminal.focusPreviousPane'
   | 'terminal.equalizePaneSizes'
@@ -955,6 +957,30 @@ export const KEYBINDING_DEFINITIONS: readonly KeybindingDefinition[] = [
     scope: 'terminal',
     searchKeywords: ['shortcut', 'pane', 'clear'],
     defaultBindings: platformBindings(['Mod+K'])
+  },
+  {
+    id: 'terminal.previousCommand',
+    title: 'Go to previous terminal command',
+    group: 'Terminal Panes',
+    scope: 'terminal',
+    searchKeywords: ['shortcut', 'terminal', 'command', 'previous', 'prompt', 'shell'],
+    defaultBindings: {
+      darwin: ['Mod+Alt+ArrowUp'],
+      linux: ['Mod+Shift+ArrowUp'],
+      win32: ['Mod+Shift+ArrowUp']
+    }
+  },
+  {
+    id: 'terminal.nextCommand',
+    title: 'Go to next terminal command',
+    group: 'Terminal Panes',
+    scope: 'terminal',
+    searchKeywords: ['shortcut', 'terminal', 'command', 'next', 'prompt', 'shell'],
+    defaultBindings: {
+      darwin: ['Mod+Alt+ArrowDown'],
+      linux: ['Mod+Shift+ArrowDown'],
+      win32: ['Mod+Shift+ArrowDown']
+    }
   },
   {
     id: 'terminal.focusNextPane',

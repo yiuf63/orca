@@ -15,6 +15,7 @@ import { attachWebgl, cancelPendingWebglRefresh, disposeWebgl } from './pane-web
 import { configureLazyArabicShapingJoiner } from './terminal-arabic-shaping-joiner'
 import { TerminalLigaturesAddon } from './terminal-ligatures-addon'
 import { resolveCursorAgentImeAnchor } from './terminal-ime-anchor'
+import { attachTerminalInlineImages, disposeTerminalInlineImages } from './terminal-inline-images'
 
 // ---------------------------------------------------------------------------
 // Pane creation, terminal open/close, addon management
@@ -49,6 +50,7 @@ export function openTerminal(pane: ManagedPaneInternal): void {
   terminal.loadAddon(serializeAddon)
   terminal.loadAddon(unicode11Addon)
   terminal.loadAddon(webLinksAddon)
+  attachTerminalInlineImages(pane)
   attachTerminalMouseWheelMultiplier(terminal, {
     getTuiMouseWheelMultiplier: terminalTuiScrollSensitivity
   })
@@ -265,6 +267,9 @@ export function disposePane(
   } catch {
     /* ignore */
   }
+  pane.osc133CommandTracker?.dispose()
+  pane.osc133CommandTracker = null
+  disposeTerminalInlineImages(pane)
   disposeWebgl(pane)
   try {
     pane.searchAddon.dispose()

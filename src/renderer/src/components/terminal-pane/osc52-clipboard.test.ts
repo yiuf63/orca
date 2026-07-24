@@ -26,10 +26,8 @@ describe('parseOsc52', () => {
     expect(result).toEqual({ kind: 'write', selections: 's0', text: 'buffered' })
   })
 
-  it('flags clipboard queries without decoding — we must not answer them', () => {
-    // Why: answering would leak the user's clipboard to any process writing
-    // to the PTY. The lifecycle handler drops queries on the floor.
-    expect(parseOsc52('c;?')).toEqual({ kind: 'query' })
+  it('flags clipboard queries without decoding their payload', () => {
+    expect(parseOsc52('c;?')).toEqual({ kind: 'query', selections: 'c' })
   })
 
   it('tolerates whitespace in the base64 payload', () => {
@@ -112,5 +110,62 @@ describe('handleOsc52ClipboardRequest', () => {
     })
 
     expect(onBlockedWrite).not.toHaveBeenCalled()
+  })
+
+  it('answers clipboard queries only when the independent read permission is enabled', async () => {
+    const readClipboardText = vi.fn().mockResolvedValue('本地 clipboard')
+    const sendInput = vi.fn(() => true)
+
+    handleOsc52ClipboardRequest('c;?', {
+      allowClipboardWrite: false,
+      writeClipboardText: vi.fn().mockResolvedValue(undefined),
+      allowClipboardRead: true,
+      readClipboardText,
+      sendInput
+    })
+    await vi.waitFor(() => expect(sendInput).toHaveBeenCalledOnce())
+
+    expect(readClipboardText).toHaveBeenCalledWith({ maxBytes: 128 * 1024 })
+    expect(sendInput).toHaveBeenCalledWith(`\x1b]52;c;${b64('本地 clipboard')}\x07`)
+  })
+
+  it('does not read the clipboard when query permission is disabled', () => {
+    const readClipboardText = vi.fn().mockResolvedValue('secret')
+    const sendInput = vi.fn(() => true)
+
+    handleOsc52ClipboardRequest('c;?', {
+      allowClipboardWrite: true,
+      writeClipboardText: vi.fn().mockResolvedValue(undefined),
+      allowClipboardRead: false,
+      readClipboardText,
+      sendInput
+    })
+
+    expect(readClipboardText).not.toHaveBeenCalled()
+    expect(sendInput).not.toHaveBeenCalled()
+  })
+
+  it('drops an in-flight query reply if the pane loses authorization', async () => {
+    let resolveRead!: (value: string) => void
+    let canReply = true
+    const pendingRead = new Promise<string>((resolve) => {
+      resolveRead = resolve
+    })
+    const readClipboardText = vi.fn(() => pendingRead)
+    const sendInput = vi.fn(() => true)
+
+    handleOsc52ClipboardRequest('c;?', {
+      allowClipboardWrite: false,
+      writeClipboardText: vi.fn().mockResolvedValue(undefined),
+      allowClipboardRead: true,
+      readClipboardText,
+      canSendClipboardReadReply: () => canReply,
+      sendInput
+    })
+    canReply = false
+    resolveRead('secret')
+    await Promise.resolve()
+
+    expect(sendInput).not.toHaveBeenCalled()
   })
 })

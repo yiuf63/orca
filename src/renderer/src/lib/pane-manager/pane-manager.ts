@@ -51,6 +51,7 @@ import {
 } from './pane-split-close'
 import { FIRST_PANE_ID } from '../../../../shared/pane-key'
 import { splitPaneAroundMountedSubtree } from './pane-subtree-split'
+import type { TerminalOsc133CommandTracker } from './terminal-osc133-command-tracker'
 
 export type {
   PaneManagerOptions,
@@ -256,6 +257,28 @@ export class PaneManager {
 
   hasWebglRenderer(paneId: number): boolean {
     return this.panes.get(paneId)?.webglAddon != null
+  }
+
+  hasPaneInlineImages(paneId: number): boolean {
+    return this.panes.get(paneId)?.hasInlineImages === true
+  }
+
+  setPaneOsc133CommandTracker(paneId: number, tracker: TerminalOsc133CommandTracker): void {
+    const pane = this.panes.get(paneId)
+    if (pane) {
+      pane.osc133CommandTracker = tracker
+    }
+  }
+
+  clearPaneOsc133CommandTracker(paneId: number, tracker: TerminalOsc133CommandTracker): void {
+    const pane = this.panes.get(paneId)
+    if (pane?.osc133CommandTracker === tracker) {
+      pane.osc133CommandTracker = null
+    }
+  }
+
+  navigatePaneCommand(paneId: number, direction: 'previous' | 'next'): boolean {
+    return this.panes.get(paneId)?.osc133CommandTracker?.navigate(direction) === true
   }
 
   getLeafId(numericPaneId: number): TerminalLeafId | null {

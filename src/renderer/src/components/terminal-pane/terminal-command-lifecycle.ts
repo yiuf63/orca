@@ -5,6 +5,7 @@ type TerminalCommandLifecycleOptions = {
   onCommandFinished: (bestEffortExitCode: number | null) => void
   /** OSC 133;C — the shell exec'd a command; the pane's foreground changed. */
   onCommandStarted?: () => void
+  onOsc133Sequence?: (payload: string) => void
 }
 
 export function createTerminalCommandLifecycle(options: TerminalCommandLifecycleOptions): {
@@ -26,7 +27,10 @@ export function createTerminalCommandLifecycle(options: TerminalCommandLifecycle
     attachXtermConsumer(terminal) {
       // Why: swallow OSC 133 so shell-integration markers never paint —
       // rendering hygiene that applies regardless of side-effect authority.
-      const disposable = terminal.parser.registerOscHandler(133, () => true)
+      const disposable = terminal.parser.registerOscHandler(133, (payload) => {
+        options.onOsc133Sequence?.(payload)
+        return true
+      })
       disposables.push(disposable)
       return disposable
     },
