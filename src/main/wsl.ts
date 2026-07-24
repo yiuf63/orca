@@ -168,6 +168,23 @@ export async function listWslDistrosAsync(): Promise<string[]> {
   }
 }
 
+export function listRunningWslDistros(): string[] {
+  if (process.platform !== 'win32') {
+    return []
+  }
+
+  try {
+    const output = execFileSync('wsl.exe', ['--list', '--running', '--quiet'], {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 5000
+    })
+    return normalizeWslListOutput(output).filter(isUserWslDistro)
+  } catch {
+    return []
+  }
+}
+
 export async function listRunningWslDistrosAsync(): Promise<string[]> {
   if (process.platform !== 'win32') {
     return []
@@ -201,9 +218,22 @@ export function getDefaultWslDistro(): string | null {
  * the WSL filesystem, mirroring the Windows workspace layout. We need the
  * WSL user's $HOME to compute that path.
  */
-export function getWslHome(distro: string): string | null {
+export function getWslHome(
+  distro: string,
+  options?: { allowBoot?: boolean; onlyIfRunning?: boolean }
+): string | null {
   if (wslHomeCache.has(distro)) {
     return wslHomeCache.get(distro)!
+  }
+
+  // Why: background operations (account sync, rate limits, session checks) must NOT
+  // wake up stopped WSL distros when Orca starts up. Only explicit user actions (e.g. launching a terminal
+  // or creating a worktree) should allow booting a stopped WSL VM.
+  if (options?.allowBoot !== true || options?.onlyIfRunning) {
+    const running = listRunningWslDistros()
+    if (!running.includes(distro)) {
+      return null
+    }
   }
 
   try {
@@ -227,13 +257,13 @@ export function getWslHome(distro: string): string | null {
 
 export async function getWslHomeAsync(
   distro: string,
-  options?: { onlyIfRunning?: boolean }
+  options?: { allowBoot?: boolean; onlyIfRunning?: boolean }
 ): Promise<string | null> {
   if (wslHomeCache.has(distro)) {
     return wslHomeCache.get(distro)!
   }
 
-  if (options?.onlyIfRunning) {
+  if (options?.allowBoot !== true || options?.onlyIfRunning) {
     const running = await listRunningWslDistrosAsync()
     if (!running.includes(distro)) {
       return null
