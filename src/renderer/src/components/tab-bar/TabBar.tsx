@@ -341,29 +341,8 @@ function TabBarInner({
     () => getActiveRuntimeTarget({ activeRuntimeEnvironmentId }),
     [activeRuntimeEnvironmentId]
   )
-  const shouldProbeWindowsShellCapabilities =
-    isWindows ||
-    Boolean(activeRuntimeEnvironmentId?.trim()) ||
-    isWebClient ||
-    Boolean(worktreeConnectionId)
-  const windowsTerminalCapabilities = useWindowsTerminalCapabilities(
-    shouldProbeWindowsShellCapabilities,
-    false,
-    windowsTerminalCapabilityOwnerKey,
-    runtimeTarget,
-    worktreeConnectionId
-  )
-  const shellMenuHostPlatform = worktreeConnectionId
-    ? (worktreeRemotePlatform ?? windowsTerminalCapabilities.hostPlatform)
-    : windowsTerminalCapabilities.hostPlatform
-  const showWindowsShellMenu = shouldShowWindowsShellMenu({
-    activeRuntimeEnvironmentId,
-    hostPlatform: shellMenuHostPlatform,
-    isWindowsClient: isWindows,
-    worktreeHasRemoteConnection: Boolean(worktreeConnectionId)
-  })
-  const localProjectRuntime = useMemo(() => {
-    if (!showWindowsShellMenu || activeRuntimeEnvironmentId?.trim() || worktreeConnectionId) {
+  const localProjectRuntimePreview = useMemo(() => {
+    if (activeRuntimeEnvironmentId?.trim() || worktreeConnectionId) {
       return undefined
     }
     return getLocalProjectExecutionRuntimeContext(
@@ -376,15 +355,7 @@ function TabBarInner({
         worktreesByRepo
       },
       worktreeId,
-      'win32',
-      {
-        wslAvailable: windowsTerminalCapabilities.isLoading
-          ? undefined
-          : windowsTerminalCapabilities.wslAvailable,
-        availableWslDistros: windowsTerminalCapabilities.isLoading
-          ? null
-          : windowsTerminalCapabilities.wslDistros
-      }
+      'win32'
     )
   }, [
     activeRepoId,
@@ -393,15 +364,37 @@ function TabBarInner({
     projects,
     repos,
     settings,
-    showWindowsShellMenu,
     worktreeConnectionId,
-    windowsTerminalCapabilities.isLoading,
-    windowsTerminalCapabilities.wslAvailable,
-    windowsTerminalCapabilities.wslDistros,
     worktreeId,
     worktreesByRepo
   ])
-  const projectRuntimeShellMenuMode = getProjectRuntimeShellMenuMode(localProjectRuntime)
+  const shouldProbeWindowsWslCapabilities =
+    Boolean(activeRuntimeEnvironmentId?.trim()) ||
+    Boolean(worktreeConnectionId) ||
+    getProjectRuntimeShellMenuMode(localProjectRuntimePreview) === 'wsl'
+  const shouldProbeWindowsShellCapabilities =
+    isWindows ||
+    Boolean(activeRuntimeEnvironmentId?.trim()) ||
+    isWebClient ||
+    Boolean(worktreeConnectionId)
+  const windowsTerminalCapabilities = useWindowsTerminalCapabilities(
+    shouldProbeWindowsShellCapabilities,
+    false,
+    windowsTerminalCapabilityOwnerKey,
+    runtimeTarget,
+    worktreeConnectionId,
+    shouldProbeWindowsWslCapabilities
+  )
+  const shellMenuHostPlatform = worktreeConnectionId
+    ? (worktreeRemotePlatform ?? windowsTerminalCapabilities.hostPlatform)
+    : windowsTerminalCapabilities.hostPlatform
+  const showWindowsShellMenu = shouldShowWindowsShellMenu({
+    activeRuntimeEnvironmentId,
+    hostPlatform: shellMenuHostPlatform,
+    isWindowsClient: isWindows,
+    worktreeHasRemoteConnection: Boolean(worktreeConnectionId)
+  })
+  const projectRuntimeShellMenuMode = getProjectRuntimeShellMenuMode(localProjectRuntimePreview)
   const resolvedGroupId = groupId ?? activeGroupIdForWorktree ?? worktreeId
 
   const statusByRelativePath = useMemo(() => buildStatusMap(gitStatusEntries), [gitStatusEntries])

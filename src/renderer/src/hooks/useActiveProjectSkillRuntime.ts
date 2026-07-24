@@ -25,6 +25,18 @@ const EMPTY_ACTIVE_PROJECT_SKILL_RUNTIME: ActiveProjectSkillRuntime = Object.fre
   installDisabledReason: null
 })
 
+function shouldLoadWslCapabilities(
+  projectRuntime: ProjectExecutionRuntimeResolution | undefined
+): boolean {
+  if (!projectRuntime) {
+    return false
+  }
+  if (projectRuntime.status === 'repair-required') {
+    return true
+  }
+  return projectRuntime.runtime.kind === 'wsl'
+}
+
 export function useActiveProjectSkillRuntime(): ActiveProjectSkillRuntime {
   const runtimeState = useAppStore(
     useShallow((state) => ({
@@ -37,7 +49,18 @@ export function useActiveProjectSkillRuntime(): ActiveProjectSkillRuntime {
     }))
   )
   const currentPlatform = getCurrentPlatform()
-  const windowsCapabilities = useWindowsTerminalCapabilities(currentPlatform === 'win32')
+  const projectRuntimePreview = useMemo(
+    () => getLocalProjectExecutionRuntimeContext(runtimeState, undefined, currentPlatform),
+    [currentPlatform, runtimeState]
+  )
+  const windowsCapabilities = useWindowsTerminalCapabilities(
+    currentPlatform === 'win32',
+    false,
+    undefined,
+    { kind: 'local' },
+    undefined,
+    shouldLoadWslCapabilities(projectRuntimePreview)
+  )
 
   return useMemo(() => {
     const projectRuntime = getLocalProjectExecutionRuntimeContext(
