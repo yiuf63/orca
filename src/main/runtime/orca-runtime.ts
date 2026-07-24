@@ -112,6 +112,7 @@ import type {
   ForceDeleteWorktreeBranchResult,
   GitHubPrStartPoint,
   GitPushTarget,
+  BranchPrefixStrategy,
   GitWorktreeInfo,
   GitHubCreateIssueFields,
   GitHubOwnerRepo,
@@ -796,7 +797,7 @@ import type { Store } from '../persistence'
 import type { StatsCollector } from '../stats/collector'
 import { AgentDetector } from '../stats/agent-detector'
 import {
-  computeBranchName,
+  computeValidatedBranchName,
   computeWorktreePath,
   computeWorkspaceRoot,
   ensurePathWithinWorkspace,
@@ -810,6 +811,7 @@ import {
   shouldSetDisplayName,
   areWorktreePathsEqual
 } from '../ipc/worktree-logic'
+import { findCreatedWorktree } from '../ipc/created-worktree-reconciliation'
 import { worktreePathComparisonKey } from '../ipc/worktree-path-comparison'
 import {
   assertWorktreeDoesNotContainRegisteredWorktree,
@@ -1243,7 +1245,8 @@ function copySleepingAgentLaunchConfig(
   return {
     ...(config.agentCommand ? { agentCommand: config.agentCommand } : {}),
     agentArgs: config.agentArgs,
-    agentEnv: { ...config.agentEnv }
+    agentEnv: { ...config.agentEnv },
+    ...(config.ompResumeFilePath ? { ompResumeFilePath: config.ompResumeFilePath } : {})
   }
 }
 
@@ -1427,6 +1430,9 @@ type RuntimePtyController = {
   markReversibleStops?(ptyIds: readonly string[]): () => void
   getCwd?(ptyId: string): Promise<string | null>
   getForegroundProcess(ptyId: string): Promise<string | null>
+  inspectProcess?(
+    ptyId: string
+  ): Promise<{ foregroundProcess: string | null; hasChildProcesses: boolean }>
   confirmForegroundProcess?(ptyId: string): Promise<string | null>
   hasChildProcesses?(ptyId: string): Promise<boolean>
   clearBuffer?(ptyId: string): Promise<void>
@@ -1881,7 +1887,13 @@ async function resolveCreateBranchName(
   gitOptions: { wslDistro?: string } = {}
 ): Promise<string> {
   if (!branchNameOverride) {
-    return computeBranchName(sanitizedName, settings, username)
+    // The runtime store's getSettings() types branchPrefix loosely as string;
+    // it is always one of the BranchPrefixStrategy literals at runtime.
+    return computeValidatedBranchName(
+      sanitizedName,
+      { ...settings, branchPrefix: settings.branchPrefix as BranchPrefixStrategy },
+      username
+    )
   }
   if (branchNameOverride.startsWith('-')) {
     throw new Error('Branch name must not start with "-"')
@@ -4089,7 +4101,17 @@ export class OrcaRuntimeService {
       worktreeId !== undefined
         ? ([[worktreeId, session.tabsByWorktree[worktreeId] ?? []]] as const)
         : Object.entries(session.tabsByWorktree ?? {})
+    // Why: workspaceSession keys are `${repoId}::${path}` and are not pruned when
+    // a repo disappears from this client's view (e.g. removed on another client,
+    // or a stale browser-persisted session). Hydrating such a key would surface a
+    // phantom "unknown"/duplicate workspace with no live repo behind it. Only
+    // hydrate sessions whose repo still exists; leave unparseable keys alone.
+    const liveRepoIds = new Set((this.store?.getRepos?.() ?? []).map((repo) => repo.id))
     for (const [entryWorktreeId, persistedTabs] of entries) {
+      const ownerRepoId = splitWorktreeIdForFilesystem(entryWorktreeId)?.repoId
+      if (ownerRepoId && !liveRepoIds.has(ownerRepoId)) {
+        continue
+      }
       const existing = this.mobileSessionTabsByWorktree.get(entryWorktreeId)
       if (
         existing &&
@@ -15723,13 +15745,15 @@ export class OrcaRuntimeService {
   async inspectTerminalProcess(
     terminalSelector: string
   ): Promise<{ foregroundProcess: string | null; hasChildProcesses: boolean }> {
-    const leaf = this.resolveLeafForHandle(terminalSelector)
+    const leaf = this.resolveLiveLeafForHandle(terminalSelector)
     if (!leaf?.ptyId || !this.ptyController) {
-      return { foregroundProcess: null, hasChildProcesses: false }
+      throw new Error('terminal_gone')
+    }
+    if (this.ptyController.inspectProcess) {
+      return this.ptyController.inspectProcess(leaf.ptyId)
     }
     const foregroundProcess = await this.ptyController.getForegroundProcess(leaf.ptyId)
-    const hasChildProcesses =
-      (await this.ptyController.hasChildProcesses?.(leaf.ptyId).catch(() => false)) ?? false
+    const hasChildProcesses = (await this.ptyController.hasChildProcesses?.(leaf.ptyId)) ?? false
     return { foregroundProcess, hasChildProcesses }
   }
 
@@ -18736,7 +18760,8 @@ export class OrcaRuntimeService {
     const gitWorktrees = hasLocalWorktreeGitOptions
       ? await listWorktrees(repo.path, localWorktreeGitOptions)
       : await listWorktrees(repo.path)
-    const created = gitWorktrees.find((gw) => areWorktreePathsEqual(gw.path, worktreePath))
+    // Why: Git may canonicalize a symlinked create path; its exact branch identifies the listed row.
+    const created = findCreatedWorktree(gitWorktrees, worktreePath, branchName)
     if (!created) {
       throw new Error('Worktree created but not found in listing')
     }
@@ -19965,6 +19990,12 @@ export class OrcaRuntimeService {
     const now = Date.now()
     let updated = 0
     for (let i = 0; i < orderedIds.length; i++) {
+      // Why: a sort-order snapshot must only reorder existing worktrees, never
+      // mint new meta — a stale id would otherwise resurrect an orphan workspace
+      // (setWorktreeMeta has no repo-existence check).
+      if (!this.store.getWorktreeMeta(orderedIds[i])) {
+        continue
+      }
       this.store.setWorktreeMeta(orderedIds[i], { sortOrder: now - i * 1000 })
       updated++
     }
@@ -21189,6 +21220,7 @@ export class OrcaRuntimeService {
           ? request.agentArgs
           : resolveTuiAgentLaunchArgs(request.agent, settings.agentDefaultArgs),
       agentEnv: resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv),
+      ompResumeFilePath: request.ompResumeFilePath,
       sessionOptions: this.toAgentSessionOptions(request.launchPreferences),
       platform,
       shell,
@@ -22909,7 +22941,7 @@ export class OrcaRuntimeService {
     if (pty) {
       const tabId = pty.pty.tabId
       if (!tabId) {
-        throw new Error('terminal_tab_not_found')
+        return this.closeTerminal(handle)
       }
       // Why: a handle-addressed CLI/automation close is an explicit intent, so
       // it must stay destructive under the non-user close adjudication gate.
