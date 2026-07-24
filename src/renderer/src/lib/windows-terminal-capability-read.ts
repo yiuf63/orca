@@ -6,7 +6,8 @@ export type WindowsTerminalCapabilityLoadTarget = RuntimeClientTarget
 
 export async function readWindowsTerminalCapabilities(
   target: WindowsTerminalCapabilityLoadTarget,
-  sshConnectionId?: string | null
+  sshConnectionId?: string | null,
+  includeWsl = true
 ): Promise<WindowsTerminalCapabilities> {
   if (sshConnectionId) {
     const remoteCapabilityPromise =
@@ -39,8 +40,8 @@ export async function readWindowsTerminalCapabilities(
   if (target.kind === 'local') {
     const [wslAvailable, wslDistros, pwshAvailable, gitBashAvailable, hostPlatform] =
       await Promise.all([
-        window.api.wsl.isAvailable().catch(() => false),
-        window.api.wsl.listDistros().catch(() => []),
+        includeWsl ? window.api.wsl.isAvailable().catch(() => false) : Promise.resolve(false),
+        includeWsl ? window.api.wsl.listDistros().catch(() => []) : Promise.resolve([]),
         window.api.pwsh.isAvailable().catch(() => false),
         window.api.gitBash.isAvailable().catch(() => false),
         window.api.runtime
@@ -60,12 +61,16 @@ export async function readWindowsTerminalCapabilities(
 
   const [wslAvailable, wslDistros, pwshAvailable, gitBashAvailable, hostPlatform] =
     await Promise.all([
-      callRuntimeRpc<boolean>(target, 'host.wsl.isAvailable', undefined, {
-        timeoutMs: 15_000
-      }).catch(() => false),
-      callRuntimeRpc<string[]>(target, 'host.wsl.listDistros', undefined, {
-        timeoutMs: 15_000
-      }).catch(() => []),
+      includeWsl
+        ? callRuntimeRpc<boolean>(target, 'host.wsl.isAvailable', undefined, {
+            timeoutMs: 15_000
+          }).catch(() => false)
+        : Promise.resolve(false),
+      includeWsl
+        ? callRuntimeRpc<string[]>(target, 'host.wsl.listDistros', undefined, {
+            timeoutMs: 15_000
+          }).catch(() => [])
+        : Promise.resolve([]),
       callRuntimeRpc<boolean>(target, 'host.pwsh.isAvailable', undefined, {
         timeoutMs: 15_000
       }).catch(() => false),

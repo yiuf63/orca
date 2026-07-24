@@ -724,7 +724,9 @@ export function ClaudeSwitcherMenu({
     navigator.userAgent.includes('Windows') || hasActiveRuntimeEnvironment,
     false,
     getWindowsTerminalCapabilityOwnerKey(settings?.activeRuntimeEnvironmentId),
-    runtimeTarget
+    runtimeTarget,
+    undefined,
+    hasActiveRuntimeEnvironment || shouldIncludeSettingsWslRuntime(settings)
   )
   const claudeAccountSyncKey = useAppStore((s) => {
     const settings = s.settings
@@ -1394,7 +1396,9 @@ export function CodexSwitcherMenu({
     navigator.userAgent.includes('Windows') || hasActiveRuntimeEnvironment,
     false,
     getWindowsTerminalCapabilityOwnerKey(settings?.activeRuntimeEnvironmentId),
-    runtimeTarget
+    runtimeTarget,
+    undefined,
+    hasActiveRuntimeEnvironment || shouldIncludeSettingsWslRuntime(settings)
   )
   const codexAccountSyncKey = useAppStore((s) => {
     const settings = s.settings

@@ -102,6 +102,52 @@ describe('windows terminal capabilities', () => {
     expect(runtimeGetStatus).toHaveBeenCalledTimes(1)
   })
 
+  it('can load host shell capabilities without probing WSL', async () => {
+    const {
+      wslIsAvailable,
+      wslListDistros,
+      pwshIsAvailable,
+      isGitBashAvailable,
+      runtimeGetStatus
+    } = stubTerminalCapabilityApi({
+      wslAvailable: true,
+      pwshAvailable: true,
+      wslDistros: ['Ubuntu'],
+      gitBashAvailable: true
+    })
+
+    await expect(loadWindowsTerminalCapabilities({ includeWsl: false })).resolves.toEqual({
+      wslAvailable: false,
+      wslDistros: [],
+      pwshAvailable: true,
+      gitBashAvailable: true,
+      hostPlatform: 'win32',
+      isLoading: false
+    })
+
+    expect(wslIsAvailable).not.toHaveBeenCalled()
+    expect(wslListDistros).not.toHaveBeenCalled()
+    expect(pwshIsAvailable).toHaveBeenCalledTimes(1)
+    expect(isGitBashAvailable).toHaveBeenCalledTimes(1)
+    expect(runtimeGetStatus).toHaveBeenCalledTimes(1)
+    expect(getCachedWindowsTerminalCapabilities()).toEqual({
+      wslAvailable: false,
+      wslDistros: [],
+      pwshAvailable: false,
+      gitBashAvailable: false,
+      hostPlatform: null,
+      isLoading: false
+    })
+    expect(getCachedWindowsTerminalCapabilities('local', false)).toEqual({
+      wslAvailable: false,
+      wslDistros: [],
+      pwshAvailable: true,
+      gitBashAvailable: true,
+      hostPlatform: 'win32',
+      isLoading: false
+    })
+  })
+
   it('keeps WSL available when the PowerShell version probe fails', async () => {
     const wslIsAvailable = vi.fn().mockResolvedValue(true)
     const pwshIsAvailable = vi.fn().mockRejectedValue(new Error('pwsh probe failed'))
