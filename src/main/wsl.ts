@@ -1,4 +1,5 @@
 import { execFile, execFileSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { parseWslUncPath, toWindowsWslPath } from '../shared/wsl-paths'
 
 export { toWindowsWslPath } from '../shared/wsl-paths'
@@ -304,16 +305,13 @@ export function isWslAvailable(): boolean {
     return false
   }
 
-  try {
-    execFileSync('wsl.exe', ['--status'], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 5000
-    })
-    wslAvailableCache = true
-  } catch {
-    wslAvailableCache = false
-  }
-
+  // Why: running `wsl.exe --status` queries LxssManager service which wakes/launches
+  // stopped WSL distros and spawns vmmemwsl. Checking wsl.exe binary existence on disk
+  // verifies whether WSL is installed without launching any WSL processes.
+  const windir = process.env.WINDIR || 'C:\\Windows'
+  const system32Wsl = `${windir}\\System32\\wsl.exe`
+  const sysnativeWsl = `${windir}\\Sysnative\\wsl.exe`
+  wslAvailableCache = existsSync(system32Wsl) || existsSync(sysnativeWsl)
   return wslAvailableCache
 }
 
