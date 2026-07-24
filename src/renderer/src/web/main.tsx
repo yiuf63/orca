@@ -19,6 +19,7 @@ import {
 import { installWebPreloadApi } from './web-preload-api'
 import { I18nProvider } from '../i18n/I18nProvider'
 import { translate } from '../i18n/i18n'
+import { installReactScanDevOverlay } from '../lib/react-scan-dev-overlay'
 
 const App = lazy(() => import('../App'))
 
@@ -89,8 +90,19 @@ function WebRootBoundary(): React.JSX.Element {
   )
 }
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <I18nProvider>
-    <WebRootBoundary />
-  </I18nProvider>
-)
+const rootElement = document.getElementById('root')
+if (!rootElement) {
+  throw new Error('Web renderer root element not found.')
+}
+
+void bootstrapWebRenderer(rootElement)
+
+async function bootstrapWebRenderer(root: HTMLElement): Promise<void> {
+  await installReactScanDevOverlay()
+
+  ReactDOM.createRoot(root).render(
+    <I18nProvider>
+      <WebRootBoundary />
+    </I18nProvider>
+  )
+}
