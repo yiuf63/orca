@@ -32,6 +32,7 @@ export type TerminalShortcutAction =
   | { type: 'copySelection' }
   | { type: 'toggleSearch' }
   | { type: 'clearActivePane' }
+  | { type: 'navigateCommand'; direction: 'previous' | 'next' }
   | { type: 'focusPane'; direction: 'next' | 'previous' }
   | { type: 'equalizePaneSizes' }
   | { type: 'toggleExpandActivePane' }
@@ -102,6 +103,14 @@ export function resolveTerminalShortcutAction(
 
     if (keybindingMatchesAction('terminal.clear', event, platform, keybindings)) {
       return { type: 'clearActivePane' }
+    }
+
+    if (keybindingMatchesAction('terminal.previousCommand', event, platform, keybindings)) {
+      return { type: 'navigateCommand', direction: 'previous' }
+    }
+
+    if (keybindingMatchesAction('terminal.nextCommand', event, platform, keybindings)) {
+      return { type: 'navigateCommand', direction: 'next' }
     }
 
     if (keybindingMatchesAction('terminal.focusPreviousPane', event, platform, keybindings)) {

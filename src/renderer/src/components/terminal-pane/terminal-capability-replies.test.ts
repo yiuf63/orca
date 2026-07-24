@@ -259,7 +259,7 @@ describe('installTerminalCapabilityReplyHandlers', () => {
     }
   })
 
-  it('answers window and cell pixel-size reports from renderer geometry', () => {
+  it('answers window, cell, and character-size reports from renderer geometry', () => {
     const sendInput = vi.fn<(data: string) => boolean>(() => true)
     const observe = createTerminalPixelSizeQueryResponder(
       {
@@ -270,10 +270,11 @@ describe('installTerminalCapabilityReplyHandlers', () => {
       sendInput
     )
 
-    observe('\x1b[14t\x1b[16t')
+    observe('\x1b[14t\x1b[16t\x1b[18t')
 
     expect(sendInput).toHaveBeenCalledWith('\x1b[4;720;900t')
     expect(sendInput).toHaveBeenCalledWith('\x1b[6;18;9t')
+    expect(sendInput).toHaveBeenCalledWith('\x1b[8;40;100t')
   })
 
   it('answers split pixel-size reports', () => {

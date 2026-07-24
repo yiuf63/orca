@@ -6977,7 +6977,10 @@
             "fastDescription": "Multiplicador adicional al desplazarse con una tecla modificadora.",
             "tui": "TUI",
             "tuiDescription": "Eventos discretos de rueda para apps de terminal de pantalla completa."
-          }
+          },
+          "b81f06a9c2": "Permitir lecturas del portapapeles por TUI (OSC 52)",
+          "41e753c28d": "Permite que los programas del terminal activo lean el portapapeles del sistema mientras Orca tiene el foco, incluso a través de SSH.",
+          "8bc94512ae": "Permite que el terminal activo con foco lea texto del portapapeles. Actívalo solo para terminales y hosts SSH de confianza."
         },
         "TerminalSettingsPreview": {
           "a63953a48a": "Vista previa del tema {{value0}}",
@@ -8496,7 +8499,9 @@
               "c38c18be15": "selección",
               "797fdfe4ca": "seleccionar",
               "603818e8d8": "Copia automáticamente las selecciones del terminal al portapapeles en cuanto se hace una selección.",
-              "3bdc84f059": "Copiar al seleccionar"
+              "3bdc84f059": "Copiar al seleccionar",
+              "24d8b6c3a1": "Permitir lecturas del portapapeles por TUI (OSC 52)",
+              "f1e7a09b42": "Permite que el terminal activo con foco lea texto del portapapeles mediante OSC 52, incluso a través de SSH."
             }
           },
           "search": {

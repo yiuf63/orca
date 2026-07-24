@@ -497,6 +497,10 @@ function createManager(paneCount = 1, initialActivePaneId: number | null = null)
     markPaneHasComplexScriptOutput: vi.fn(),
     rebuildPaneWebgl: vi.fn(),
     hasWebglRenderer: vi.fn(() => false),
+    hasPaneInlineImages: vi.fn(() => false),
+    setPaneOsc133CommandTracker: vi.fn(),
+    clearPaneOsc133CommandTracker: vi.fn(),
+    navigatePaneCommand: vi.fn(() => false),
     getPanes: vi.fn(() => panes),
     closePane: vi.fn(),
     getActivePane: vi.fn<() => { id: number; leafId?: string } | null>(() =>
@@ -8869,7 +8873,10 @@ describe('connectPanePty', () => {
       return window.api.pty.setHiddenRendererPty as unknown as ReturnType<typeof vi.fn>
     }
 
-    async function connectHiddenPane(deps: ReturnType<typeof createDeps>): Promise<{
+    async function connectHiddenPane(
+      deps: ReturnType<typeof createDeps>,
+      options: { hasInlineImages?: boolean } = {}
+    ): Promise<{
       transport: MockTransport
       pane: ReturnType<typeof createPane>
       dataCallback: (
@@ -8897,6 +8904,7 @@ describe('connectPanePty', () => {
       transportFactoryQueue.push(transport)
       const pane = createPane(1)
       const manager = createManager(1)
+      manager.hasPaneInlineImages.mockReturnValue(options.hasInlineImages === true)
       const binding = connectPanePty(pane as never, manager as never, deps as never) as {
         syncProcessTracking: () => void
         dispose: () => void
@@ -9221,6 +9229,19 @@ describe('connectPanePty', () => {
       expect(transport.connect).toHaveBeenCalledWith(
         expect.objectContaining({ initiallyHidden: true })
       )
+    })
+
+    it('keeps image-bearing panes on live renderer delivery while hidden', async () => {
+      enableMainAuthority()
+      const deps = createDeps({ isVisibleRef: { current: false } })
+      const { transport, dataCallback } = await connectHiddenPane(deps, {
+        hasInlineImages: true
+      })
+      const setHiddenRendererPty = getSetHiddenRendererPtyMock()
+
+      expect(transport.connect.mock.calls[0]![0]).not.toHaveProperty('initiallyHidden')
+      dataCallback('inline-image-followup-output\r\n')
+      expect(setHiddenRendererPty).not.toHaveBeenCalledWith('pty-id', true)
     })
 
     it('does not gate or fact-reply when the hidden-delivery kill switch is off', async () => {
@@ -10481,13 +10502,13 @@ describe('connectPanePty', () => {
     )
     await flushAsyncTicks(6)
 
-    const queryBurst = '\x1b[c\x1b]11;?\x1b\\\x1b[>q\x1b[14t\x1b[16t'
+    const queryBurst = '\x1b[c\x1b]11;?\x1b\\\x1b[>q\x1b[14t\x1b[16t\x1b[18t'
     const coalescedChunk = `${queryBurst}\x1b[?2026h${'codex redraw '.repeat(8_000)}`
     capturedDataCallback.current?.(coalescedChunk)
 
     expect(transport.sendInput).toHaveBeenCalledWith('\x1b]11;rgb:1111/1111/1111\x1b\\')
     expect(pane.terminal.write).toHaveBeenCalledWith(
-      '\x1b[c\x1b[>q\x1b[14t\x1b[16t',
+      '\x1b[c\x1b[>q\x1b[14t\x1b[16t\x1b[18t',
       expect.any(Function)
     )
     expect(pane.terminal.write).not.toHaveBeenCalledWith(coalescedChunk, expect.any(Function))

@@ -130,7 +130,7 @@ __orca_restore_agent_teams_path
 ${getPosixOmpShellWrapper()}
 # Why: Codex must keep using Orca's runtime CODEX_HOME after profile scripts.
 [[ -n "\${ORCA_CODEX_HOME:-}" ]] && export CODEX_HOME="\${ORCA_CODEX_HOME}"
-# Why: emit OSC 133 C/D so terminal-command-lifecycle can drop stale agent
+# Why: emit OSC 133 A/B/C/D so prompt navigation and command lifecycle stay aligned
 # status when the foreground command (e.g. an interrupted Claude/Codex CLI)
 # exits — mirrors the zsh wrapper. Without this, bash users (default on most
 # Linux distros) keep a stuck 'working' spinner for up to 30 min after the
@@ -161,6 +161,7 @@ __orca_osc133_preexec() {
   case "$BASH_COMMAND" in
     *__orca_osc133_precmd*|*__orca_osc133_prompt_done*|*__orca_prompt_mark*) return ;;
   esac
+  printf "\\033]133;B\\007"
   printf "\\033]133;C\\007"
   __orca_in_command=1
 }
@@ -256,6 +257,7 @@ __orca_osc133_precmd() {
   printf "\\033]133;A\\007"
 }
 __orca_osc133_preexec() {
+  printf "\\033]133;B\\007"
   printf "\\033]133;C\\007"
   __orca_in_command=1
 }

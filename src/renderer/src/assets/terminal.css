@@ -62,6 +62,23 @@
   caret-color: transparent;
 }
 
+.pane-manager-root .xterm-command-marker {
+  pointer-events: none;
+  border-left: 2px solid color-mix(in srgb, var(--muted-foreground) 38%, transparent);
+}
+
+.pane-manager-root .xterm-command-marker[data-command-state='running'] {
+  border-left-color: var(--terminal-pane-locate);
+}
+
+.pane-manager-root .xterm-command-marker[data-command-state='succeeded'] {
+  border-left-color: var(--status-success);
+}
+
+.pane-manager-root .xterm-command-marker[data-command-state='failed'] {
+  border-left-color: var(--destructive);
+}
+
 /* Divider: the element is a wide transparent hit area; the visible line is
    drawn by ::after so that setting `background` on the element never hides it. */
 .pane-divider.is-vertical,

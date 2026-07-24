@@ -53,11 +53,12 @@ describe('createTerminalCommandLifecycle', () => {
 
   it('registers an xterm OSC consumer without emitting lifecycle events', () => {
     const onCommandFinished = vi.fn()
+    const onOsc133Sequence = vi.fn()
     const dispose = vi.fn()
     const registerOscHandler = vi.fn((_code: number, _handler: (payload: string) => boolean) => ({
       dispose
     }))
-    const lifecycle = createTerminalCommandLifecycle({ onCommandFinished })
+    const lifecycle = createTerminalCommandLifecycle({ onCommandFinished, onOsc133Sequence })
 
     const disposable = lifecycle.attachXtermConsumer({
       parser: { registerOscHandler }
@@ -66,6 +67,7 @@ describe('createTerminalCommandLifecycle', () => {
     expect(registerOscHandler).toHaveBeenCalledWith(133, expect.any(Function))
     const handler = registerOscHandler.mock.calls[0][1]
     expect(handler('D;0')).toBe(true)
+    expect(onOsc133Sequence).toHaveBeenCalledWith('D;0')
     expect(onCommandFinished).not.toHaveBeenCalled()
 
     disposable.dispose()

@@ -160,6 +160,7 @@ import {
   isPassiveCompletedHibernationEvidence
 } from '@/lib/sleeping-agent-pane-ownership'
 import { createTerminalCommandLifecycle } from './terminal-command-lifecycle'
+import { createTerminalOsc133CommandTracker } from '@/lib/pane-manager/terminal-osc133-command-tracker'
 import { createPaneForegroundAgentTracker } from './pane-foreground-agent-tracker'
 import { parseAppSshPtyId } from '../../../../shared/ssh-pty-id'
 import { resolveSshPaneConnectGate } from './ssh-pane-connect-gate'
@@ -215,6 +216,7 @@ import { scheduleTerminalWebglAtlasRecovery } from './terminal-webgl-atlas-recov
 import {
   CONPTY_DA1_RESPONSE,
   DEFAULT_DA1_RESPONSE,
+  INLINE_IMAGE_DA1_RESPONSE,
   createTerminalPixelSizeQueryResponder,
   installTerminalCapabilityReplyHandlers,
   sendTerminalOscColorQueryReplies
@@ -2106,7 +2108,10 @@ export function connectPanePty(
     // byte authority after this function explicitly revoked routing trust.
     sampleVisiblePaneForegroundAgent(true)
   }
+  const osc133CommandTracker = createTerminalOsc133CommandTracker(pane.terminal)
+  manager.setPaneOsc133CommandTracker(pane.id, osc133CommandTracker)
   const commandLifecycle = createTerminalCommandLifecycle({
+    onOsc133Sequence: osc133CommandTracker.handleSequence,
     onCommandStarted: () => {
       // Why: a new command invalidates cleanup waiting on the previous D; only
       // a later confirmed shell boundary may retire this pane's live identity.
@@ -3560,7 +3565,7 @@ export function connectPanePty(
     // (#7329), so send immediately.
     sendInput: sendDesktopQueryReplyImmediate,
     isReplaying: () => isPaneReplaying(deps.replayingPanesRef, pane.id),
-    ...(isNativeWindowsConpty ? { da1Response: CONPTY_DA1_RESPONSE } : {})
+    da1Response: isNativeWindowsConpty ? CONPTY_DA1_RESPONSE : INLINE_IMAGE_DA1_RESPONSE
   })
   const respondToTerminalPixelSizeQueries = createTerminalPixelSizeQueryResponder(
     pane.terminal,
@@ -5456,12 +5461,14 @@ export function connectPanePty(
     // spawn IPC lets main mark the PTY before its first byte — including
     // codex spawns: the model responder answers their startup probes from
     // byte zero now that the 10s renderer query window is gone.
+    // Image-bearing panes stay live because ANSI snapshots cannot serialize bitmap tiles.
     // Remote-runtime PTYs are never gate-markable (no local main transit).
     function shouldDeclareHiddenAtSpawn(): boolean {
       return (
         hiddenDeliveryGateActive &&
         !runtimeEnvironmentId &&
         !disposed &&
+        !manager.hasPaneInlineImages(pane.id) &&
         !shouldWritePtyOutputForeground(deps.isVisibleRef.current)
       )
     }
@@ -5575,7 +5582,10 @@ export function connectPanePty(
       if (!isHiddenDeliveryGateManagedPty(ptyId) || !canUseHiddenOutputSnapshot(ptyId)) {
         return
       }
-      const shouldHide = !disposed && !shouldWritePtyOutputForeground(deps.isVisibleRef.current)
+      const shouldHide =
+        !disposed &&
+        !manager.hasPaneInlineImages(pane.id) &&
+        !shouldWritePtyOutputForeground(deps.isVisibleRef.current)
       const isFirstSyncForPty = hiddenDeliverySyncedPtyId !== ptyId
       hiddenDeliverySyncedPtyId = ptyId
       if (shouldHide) {
@@ -8325,6 +8335,8 @@ export function connectPanePty(
         pendingGeometryReportRaf = null
       }
       commandLifecycle.dispose()
+      manager.clearPaneOsc133CommandTracker(pane.id, osc133CommandTracker)
+      osc133CommandTracker.dispose()
       deferredCommandFinishedStatusDrop = null
       visibleForegroundSamplePending = false
       visibleForegroundSampleSettled = false

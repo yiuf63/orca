@@ -534,6 +534,7 @@ describePosix('local PTY shell-ready launch config', () => {
 
     // The exact escape sequences terminal-command-lifecycle parses (133;D = finished, 133;C = start).
     expect(bashRc).toContain('printf "\\033]133;D;%s\\007"')
+    expect(bashRc).toContain('printf "\\033]133;B\\007"')
     expect(bashRc).toContain('printf "\\033]133;C\\007"')
     expect(bashRc).toContain(
       'PROMPT_COMMAND="__orca_osc133_precmd${PROMPT_COMMAND:+;${PROMPT_COMMAND}}"'
@@ -543,6 +544,7 @@ describePosix('local PTY shell-ready launch config', () => {
     )
     // Sanity: zsh wrapper emits the same markers — both branches must stay in sync.
     expect(zshRc).toContain('printf "\\033]133;D;%s\\007"')
+    expect(zshRc).toContain('printf "\\033]133;B\\007"')
     expect(zshRc).toContain('printf "\\033]133;C\\007"')
   })
 

@@ -151,7 +151,8 @@ export function isStatelessRendererReplyCsiQuery(sequence: string): boolean {
     sequence === '\x1b[5n' ||
     sequence === '\x1b[>q' ||
     sequence === '\x1b[14t' ||
-    sequence === '\x1b[16t'
+    sequence === '\x1b[16t' ||
+    sequence === '\x1b[18t'
   )
 }
 

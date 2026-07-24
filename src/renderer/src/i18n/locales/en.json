@@ -7037,7 +7037,10 @@
             "fastDescription": "Extra multiplier while scrolling with a modifier key.",
             "tui": "TUI",
             "tuiDescription": "Discrete wheel reports for full-screen terminal apps."
-          }
+          },
+          "b81f06a9c2": "Allow TUI Clipboard Reads (OSC 52)",
+          "41e753c28d": "Let programs in the active terminal read the system clipboard while Orca is focused, including over SSH.",
+          "8bc94512ae": "Allows the focused active terminal to read clipboard text. Enable only for terminals and SSH hosts you trust."
         },
         "TerminalSettingsPreview": {
           "a63953a48a": "Preview {{value0}} theme",
@@ -8556,7 +8559,9 @@
               "c38c18be15": "selection",
               "797fdfe4ca": "select",
               "603818e8d8": "Automatically copy terminal selections to the clipboard as soon as a selection is made.",
-              "3bdc84f059": "Copy on Select"
+              "3bdc84f059": "Copy on Select",
+              "24d8b6c3a1": "Allow TUI Clipboard Reads (OSC 52)",
+              "f1e7a09b42": "Let the focused active terminal read clipboard text through OSC 52, including over SSH."
             }
           },
           "search": {
