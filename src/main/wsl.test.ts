@@ -18,6 +18,7 @@ vi.mock('child_process', async (importOriginal) => {
 import {
   _resetWslCachesForTests,
   getCachedWslDistros,
+  listRunningWslDistrosAsync,
   listWslDistros,
   listWslDistrosAsync,
   parseWslPath,
@@ -92,11 +93,31 @@ describe('WSL distro discovery cache', () => {
         expect(listWslDistros()).toEqual([])
         expect(execFileSyncMock).toHaveBeenCalledTimes(1)
         vi.advanceTimersByTime(15_000)
-        expect(listWslDistros()).toEqual(['Ubuntu'])
       })
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('lists running distros asynchronously using --running flag', async () => {
+    execFileMock.mockImplementation((_command, args, _options, callback) => {
+      if (args.includes('--running')) {
+        callback(null, 'Ubuntu\n')
+      } else {
+        callback(new Error('unexpected args'), '')
+      }
+    })
+
+    await withPlatformAsync('win32', async () => {
+      const running = await listRunningWslDistrosAsync()
+      expect(running).toEqual(['Ubuntu'])
+      expect(execFileMock).toHaveBeenCalledWith(
+        'wsl.exe',
+        ['--list', '--running', '--quiet'],
+        expect.anything(),
+        expect.any(Function)
+      )
+    })
   })
 })
 

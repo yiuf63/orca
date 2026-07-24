@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { scanAiVaultSessions } from './session-scanner'
-import { getWslHomeAsync, listWslDistrosAsync } from '../wsl'
+import { getWslHomeAsync, listRunningWslDistrosAsync } from '../wsl'
 import type { AiVaultListArgs, AiVaultListResult } from '../../shared/ai-vault-types'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 
@@ -86,8 +86,9 @@ export async function getAiVaultWslHomeDirs(): Promise<string[]> {
   if (process.platform !== 'win32') {
     return []
   }
+  const runningDistros = await listRunningWslDistrosAsync()
   const homes = await Promise.all(
-    (await listWslDistrosAsync()).map((distro) => getWslHomeAsync(distro))
+    runningDistros.map((distro) => getWslHomeAsync(distro, { onlyIfRunning: true }))
   )
   return homes.filter((homeDir): homeDir is string => Boolean(homeDir))
 }

@@ -26,8 +26,12 @@ export function normalizedSkillIdentityPath(value: string): string {
   return process.platform === 'win32' ? normalized.toLocaleLowerCase('en-US') : normalized
 }
 
-export function skillPhysicalIdentity(resolvedPath: string, fileStat: Stats): string {
-  const inodeIdentity = fileStat.dev || fileStat.ino ? `${fileStat.dev}:${fileStat.ino}` : null
+export function skillPhysicalIdentity(
+  resolvedPath: string,
+  fileStat?: Awaited<ReturnType<typeof stat>> | Stats
+): string {
+  const inodeIdentity =
+    fileStat && (fileStat.dev || fileStat.ino) ? `${fileStat.dev}:${fileStat.ino}` : null
   return inodeIdentity ?? normalizedSkillIdentityPath(resolvedPath)
 }
 

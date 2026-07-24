@@ -15,11 +15,17 @@ type GitDirectoryAccess = {
   readFile?: (path: string) => Promise<string>
 }
 
-function isDirectoryStat(value: GitDirectoryStat): boolean {
+function isDirectoryStat(value: GitDirectoryStat | undefined): boolean {
+  if (!value) {
+    return false
+  }
   return 'type' in value ? value.type === 'directory' : value.isDirectory()
 }
 
-function isFileStat(value: GitDirectoryStat): boolean {
+function isFileStat(value: GitDirectoryStat | undefined): boolean {
+  if (!value) {
+    return false
+  }
   return 'type' in value ? value.type === 'file' : value.isFile()
 }
 
