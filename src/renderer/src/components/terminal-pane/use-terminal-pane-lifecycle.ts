@@ -898,10 +898,16 @@ export function useTerminalPaneLifecycle({
               shouldFireNotification(data) &&
               !isPaneReplaying(replayingPanesRef, pane.id)
             ) {
-              void window.api.notifications.dispatch({
-                source: 'terminal-bell',
-                terminalTitle: `${parsed.title}: ${parsed.body}`
-              })
+              void window.api.notifications
+                .dispatch({
+                  source: 'terminal-bell',
+                  terminalTitle: `${parsed.title}: ${parsed.body}`
+                })
+                .then((res) => {
+                  if (res && !res.delivered) {
+                    console.warn('[osc-9-notification] dispatch skipped/failed:', res.reason)
+                  }
+                })
             }
             return true
           })
@@ -915,10 +921,16 @@ export function useTerminalPaneLifecycle({
               shouldFireNotification(data) &&
               !isPaneReplaying(replayingPanesRef, pane.id)
             ) {
-              void window.api.notifications.dispatch({
-                source: 'terminal-bell',
-                terminalTitle: `${parsed.title}: ${parsed.body}`
-              })
+              void window.api.notifications
+                .dispatch({
+                  source: 'terminal-bell',
+                  terminalTitle: `${parsed.title}: ${parsed.body}`
+                })
+                .then((res) => {
+                  if (res && !res.delivered) {
+                    console.warn('[osc-777-notification] dispatch skipped/failed:', res.reason)
+                  }
+                })
             }
             return true
           })
