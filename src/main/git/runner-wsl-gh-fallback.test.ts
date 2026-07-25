@@ -17,7 +17,11 @@ vi.mock('child_process', () => ({
 
 vi.mock('../wsl', async (importOriginal) => ({
   ...(await importOriginal<typeof WslModule>()),
-  getDefaultWslDistro: getDefaultWslDistroMock
+  getDefaultWslDistro: getDefaultWslDistroMock,
+  listRunningWslDistros: () => {
+    const d = getDefaultWslDistroMock()
+    return d ? [d] : []
+  }
 }))
 
 import { ghExecFileAsync, glabExecFileAsync, setDefaultWslDistroOverride } from './runner'
@@ -643,9 +647,10 @@ describe('ghExecFileAsync WSL fallback', () => {
         callback(new Error('Wrong distro fallback'))
       })
 
-    await expect(
-      ghExecFileAsync(['auth', 'status'])
-    ).resolves.toEqual({ stdout: 'Logged in to github.com as override', stderr: '' })
+    await expect(ghExecFileAsync(['auth', 'status'])).resolves.toEqual({
+      stdout: 'Logged in to github.com as override',
+      stderr: ''
+    })
 
     expect(execFileMock).toHaveBeenCalledTimes(2)
     expect(execFileMock).toHaveBeenNthCalledWith(
@@ -672,9 +677,10 @@ describe('ghExecFileAsync WSL fallback', () => {
         callback(new Error('Wrong distro fallback'))
       })
 
-    await expect(
-      ghExecFileAsync(['auth', 'status'])
-    ).resolves.toEqual({ stdout: 'Logged in to github.com as default', stderr: '' })
+    await expect(ghExecFileAsync(['auth', 'status'])).resolves.toEqual({
+      stdout: 'Logged in to github.com as default',
+      stderr: ''
+    })
 
     expect(execFileMock).toHaveBeenCalledTimes(2)
     expect(execFileMock).toHaveBeenNthCalledWith(
