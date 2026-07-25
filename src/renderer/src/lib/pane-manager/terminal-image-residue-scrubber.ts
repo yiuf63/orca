@@ -124,30 +124,31 @@ export function scrubInactiveImageTilesFromLine(
 }
 
 export function scrubViewportImageResidue(terminal: Terminal): number {
-  const core = (terminal as unknown as TerminalImagePrivates)._core
-  const lines = core?._bufferService?.buffers?.normal?.lines ?? core?.buffers?.normal?.lines
-  if (!lines || typeof lines.get !== 'function') {
+  const lineGroups = resolveBufferLines(terminal)
+  if (lineGroups.length === 0) {
     return 0
   }
   let removed = 0
   const rows = terminal.rows
   const cols = terminal.cols
   const yDisp = terminal.buffer.active.viewportY
-  for (let r = 0; r < rows; r++) {
-    const line = lines.get(r + yDisp)
-    if (!line?._data || !line._extendedAttrs) {
-      continue
-    }
-    for (const key of Object.keys(line._extendedAttrs)) {
-      const col = Number(key)
-      if (col < 0 || col >= cols) {
+  for (const lines of lineGroups) {
+    for (let r = 0; r < rows; r++) {
+      const line = lines.get(r + yDisp)
+      if (!line?._data || !line._extendedAttrs) {
         continue
       }
-      const bgIndex = col * CELL_SIZE + CELL_BG_OFFSET
-      const hasExtendedBit = (line._data[bgIndex] & HAS_EXTENDED_ATTRS) !== 0
-      if (!hasExtendedBit) {
-        delete line._extendedAttrs[col]
-        removed += 1
+      for (const key of Object.keys(line._extendedAttrs)) {
+        const col = Number(key)
+        if (col < 0 || col >= cols) {
+          continue
+        }
+        const bgIndex = col * CELL_SIZE + CELL_BG_OFFSET
+        const hasExtendedBit = (line._data[bgIndex] & HAS_EXTENDED_ATTRS) !== 0
+        if (!hasExtendedBit) {
+          delete line._extendedAttrs[col]
+          removed += 1
+        }
       }
     }
   }
