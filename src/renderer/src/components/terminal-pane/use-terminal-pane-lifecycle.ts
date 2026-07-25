@@ -80,6 +80,12 @@ import {
 } from './osc52-clipboard-toast'
 import { copyTerminalSelection } from './terminal-selection-copy'
 import { parseOsc7 } from './parse-osc7'
+import {
+  createOscNotificationThrottler,
+  parseOsc777Notification,
+  parseOsc9Notification
+} from './terminal-osc-notifications'
+import { installTerminalSynchronousOutputHandler } from './terminal-synchronous-output'
 import { guardParserHandler } from './terminal-parser-handler-guard'
 import { resolveTerminalJisYenInput } from './terminal-jis-yen-input'
 import {
@@ -874,6 +880,58 @@ export function useTerminalPaneLifecycle({
           })
         )
         osc7DisposablesRef.current.set(pane.id, osc7Disposable)
+
+        // DECSET 2026 — synchronous rendering / atomic screen updates for TUIs (neovim/yazi).
+        const syncOutputDisposable = installTerminalSynchronousOutputHandler(
+          pane.terminal,
+          pane.terminal.parser
+        )
+
+        // OSC 9 & OSC 777 — CLI-initiated desktop notifications (e.g. echo -e "\x1b]9;Build done\x1b\").
+        const shouldFireNotification = createOscNotificationThrottler(2000)
+        const osc9Disposable = pane.terminal.parser.registerOscHandler(
+          9,
+          guardParserHandler('osc-9-notification', (data) => {
+            const parsed = parseOsc9Notification(data, 'Terminal')
+            if (
+              parsed &&
+              shouldFireNotification(data) &&
+              !isPaneReplaying(replayingPanesRef, pane.id)
+            ) {
+              void window.api.notifications.dispatch({
+                source: 'terminal-bell',
+                terminalTitle: `${parsed.title}: ${parsed.body}`
+              })
+            }
+            return true
+          })
+        )
+        const osc777Disposable = pane.terminal.parser.registerOscHandler(
+          777,
+          guardParserHandler('osc-777-notification', (data) => {
+            const parsed = parseOsc777Notification(data, 'Terminal')
+            if (
+              parsed &&
+              shouldFireNotification(data) &&
+              !isPaneReplaying(replayingPanesRef, pane.id)
+            ) {
+              void window.api.notifications.dispatch({
+                source: 'terminal-bell',
+                terminalTitle: `${parsed.title}: ${parsed.body}`
+              })
+            }
+            return true
+          })
+        )
+
+        osc7DisposablesRef.current.set(pane.id, {
+          dispose: () => {
+            osc7Disposable.dispose()
+            syncOutputDisposable.dispose()
+            osc9Disposable.dispose()
+            osc777Disposable.dispose()
+          }
+        })
 
         // Why: let host-handled keys bypass xterm's kitty CSI-u encoder — with kittyKeyboard on it preventDefaults Cmd+C and blocks Chromium's native copy. See xterm-bypass-policy.ts.
         let pendingTerminalInterruptKeyup = false

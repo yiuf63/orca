@@ -28,7 +28,7 @@ export function buildNotificationOptions(args: NotificationDispatchRequest): {
 } {
   if (args.source === 'terminal-bell') {
     return {
-      title: `Bell in ${args.worktreeLabel ?? 'workspace'}`,
+      title: args.terminalTitle || `Bell in ${args.worktreeLabel ?? 'workspace'}`,
       body: args.repoLabel ? `${args.repoLabel} · Attention requested` : 'Attention requested'
     }
   }
