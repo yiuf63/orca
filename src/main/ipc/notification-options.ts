@@ -27,8 +27,21 @@ export function buildNotificationOptions(args: NotificationDispatchRequest): {
   sound?: string
 } {
   if (args.source === 'terminal-bell') {
+    if (args.terminalTitle) {
+      const colonIndex = args.terminalTitle.indexOf(': ')
+      if (colonIndex !== -1) {
+        return {
+          title: args.terminalTitle.slice(0, colonIndex),
+          body: args.terminalTitle.slice(colonIndex + 2)
+        }
+      }
+      return {
+        title: 'Terminal',
+        body: args.terminalTitle
+      }
+    }
     return {
-      title: args.terminalTitle || `Bell in ${args.worktreeLabel ?? 'workspace'}`,
+      title: `Bell in ${args.worktreeLabel ?? 'workspace'}`,
       body: args.repoLabel ? `${args.repoLabel} · Attention requested` : 'Attention requested'
     }
   }
