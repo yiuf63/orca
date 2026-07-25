@@ -20,7 +20,7 @@ vi.mock('../wsl', async (importOriginal) => ({
   getDefaultWslDistro: getDefaultWslDistroMock,
   listRunningWslDistros: () => {
     const d = getDefaultWslDistroMock()
-    return d ? [d] : []
+    return Array.from(new Set([d, 'Ubuntu24', 'Ubuntu', 'Debian'].filter(Boolean) as string[]))
   }
 }))
 
