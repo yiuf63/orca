@@ -17,7 +17,11 @@ vi.mock('child_process', () => ({
 
 vi.mock('../wsl', async (importOriginal) => ({
   ...(await importOriginal<typeof WslModule>()),
-  getDefaultWslDistro: getDefaultWslDistroMock
+  getDefaultWslDistro: getDefaultWslDistroMock,
+  listRunningWslDistros: () => {
+    const d = getDefaultWslDistroMock()
+    return d ? [d] : []
+  }
 }))
 
 import { ghExecFileAsync, glabExecFileAsync } from './runner'
