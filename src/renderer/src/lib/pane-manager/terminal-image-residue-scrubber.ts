@@ -95,26 +95,61 @@ export function scrubInactiveImageTilesFromLine(
     const column = Number(key)
     const attrs = line._extendedAttrs[column]
     const imageId = attrs?.imageId
-    // Why: Kitty top-layer images remain visible after text clears the cell flag.
-    if (!attrs || imageId === undefined || imageId === -1 || isImageActive(imageId)) {
+    if (!attrs || imageId === undefined || imageId === -1) {
       continue
     }
 
     const bgIndex = column * CELL_SIZE + CELL_BG_OFFSET
     const hasExtendedBit = (line._data[bgIndex] & HAS_EXTENDED_ATTRS) !== 0
+    // Why: When text/spaces overwrite a cell (e.g. yazi switching from an image preview to text/directory view),
+    // xterm clears the cell's HAS_EXTENDED_ATTRS bit. If _extendedAttrs still holds imageId, addon-image
+    // renders the image tile over the new text. Scrub extendedAttrs on cells without HAS_EXTENDED_ATTRS bit.
     if (!hasExtendedBit) {
       delete line._extendedAttrs[column]
       removed += 1
       continue
     }
 
-    attrs.imageId = -1
-    attrs.tileId = -1
-    if (imageAttrsAreOtherwiseEmpty(attrs)) {
-      delete line._extendedAttrs[column]
-      line._data[bgIndex] &= ~HAS_EXTENDED_ATTRS
+    if (!isImageActive(imageId)) {
+      attrs.imageId = -1
+      attrs.tileId = -1
+      if (imageAttrsAreOtherwiseEmpty(attrs)) {
+        delete line._extendedAttrs[column]
+        line._data[bgIndex] &= ~HAS_EXTENDED_ATTRS
+      }
+      removed += 1
     }
-    removed += 1
+  }
+  return removed
+}
+
+export function scrubViewportImageResidue(terminal: Terminal): number {
+  const core = (terminal as unknown as TerminalImagePrivates)._core
+  const lines = core?._bufferService?.buffers?.normal?.lines ?? core?.buffers?.normal?.lines
+  if (!lines || typeof lines.get !== 'function') {
+    return 0
+  }
+  let removed = 0
+  const rows = terminal.rows
+  const cols = terminal.cols
+  const yDisp = terminal.buffer.active.viewportY
+  for (let r = 0; r < rows; r++) {
+    const line = lines.get(r + yDisp)
+    if (!line?._data || !line._extendedAttrs) {
+      continue
+    }
+    for (const key of Object.keys(line._extendedAttrs)) {
+      const col = Number(key)
+      if (col < 0 || col >= cols) {
+        continue
+      }
+      const bgIndex = col * CELL_SIZE + CELL_BG_OFFSET
+      const hasExtendedBit = (line._data[bgIndex] & HAS_EXTENDED_ATTRS) !== 0
+      if (!hasExtendedBit) {
+        delete line._extendedAttrs[col]
+        removed += 1
+      }
+    }
   }
   return removed
 }

@@ -1,7 +1,10 @@
 import { ImageAddon, type IImageAddonOptions } from '@xterm/addon-image'
 import type { IDisposable, IEvent } from '@xterm/xterm'
 import type { ManagedPaneInternal } from './pane-manager-types'
-import { createTerminalImageResidueScrubber } from './terminal-image-residue-scrubber'
+import {
+  createTerminalImageResidueScrubber,
+  scrubViewportImageResidue
+} from './terminal-image-residue-scrubber'
 
 const INLINE_IMAGE_SEQUENCE_LIMIT = 16 * 1024 * 1024
 const IMAGE_RESIDUE_SCRUB_INTERVAL_MS = 1000
@@ -84,7 +87,10 @@ export function attachTerminalInlineImages(pane: ManagedPaneInternal): void {
     pane.terminal.loadAddon(addon)
     disposables.push(
       pane.terminal.onWriteParsed(() => {
-        scheduleScrub()
+        if (pane.hasInlineImages) {
+          scrubViewportImageResidue(pane.terminal)
+          scheduleScrub()
+        }
       })
     )
 

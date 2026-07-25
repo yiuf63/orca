@@ -31,11 +31,11 @@ describe('scrubInactiveImageTilesFromLine', () => {
     vi.unstubAllGlobals()
   })
 
-  it('preserves active top-layer image tiles after text clears HAS_EXTENDED', () => {
+  it('scrubs image tiles after text clears HAS_EXTENDED even if image is active in storage', () => {
     const line = createLine({ 1: { imageId: 7, tileId: 2 } }, [])
 
-    expect(scrubInactiveImageTilesFromLine(line, (imageId) => imageId === 7)).toBe(0)
-    expect(line._extendedAttrs[1]).toEqual({ imageId: 7, tileId: 2 })
+    expect(scrubInactiveImageTilesFromLine(line, (imageId) => imageId === 7)).toBe(1)
+    expect(line._extendedAttrs[1]).toBeUndefined()
   })
 
   it('deletes inactive image-only attrs and clears the cell flag', () => {
