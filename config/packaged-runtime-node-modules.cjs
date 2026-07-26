@@ -72,6 +72,7 @@ function isPackagedExternalSpecifier(specifier) {
   return (
     !specifier.startsWith('.') &&
     !specifier.startsWith('/') &&
+    !specifier.startsWith('node:') &&
     specifier !== 'electron' &&
     !NODE_BUILTINS.has(specifier)
   )

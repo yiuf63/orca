@@ -1,0 +1,43 @@
+name: Personal Main Build & Release Artifact
+
+on:
+  push:
+    branches:
+      - personal/main
+  workflow_dispatch: {}
+
+jobs:
+  build-windows:
+    name: Build Windows Release (.exe)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build Desktop & Web
+        run: pnpm run build:desktop
+
+      - name: Build Windows Installer
+        run: |
+          node config/scripts/ensure-native-runtime.mjs --runtime=electron
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --win --publish never
+
+      - name: Upload Windows Installer Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orca-Windows-Installer
+          path: |
+            dist/*.exe
+            dist/*.blockmap
