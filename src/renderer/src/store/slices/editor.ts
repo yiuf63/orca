@@ -524,6 +524,22 @@ export type EditorSlice = {
   /** Most recently closed editor tabs per worktree (for Cmd/Ctrl+Shift+T). */
   recentlyClosedEditorTabsByWorktree: Record<string, ClosedEditorTabSnapshot[]>
   reopenClosedEditorTab: (worktreeId: string) => boolean
+  fileNavigationHistory: {
+    past: {
+      filePath: string
+      worktreeId: string
+      relativePath?: string
+      runtimeEnvironmentId?: string | null
+    }[]
+    future: {
+      filePath: string
+      worktreeId: string
+      relativePath?: string
+      runtimeEnvironmentId?: string | null
+    }[]
+  }
+  navigateFileBack: () => void
+  navigateFileForward: () => void
   setActiveFile: (fileId: string) => void
   reorderFiles: (fileIds: string[]) => void
   markFileDirty: (fileId: string, dirty: boolean) => void
@@ -2538,6 +2554,87 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
     for (const itemId of closingItemIds) {
       get().closeUnifiedTab?.(itemId)
     }
+  },
+
+  fileNavigationHistory: { past: [], future: [] },
+
+  navigateFileBack: () => {
+    const s = get()
+    const history = s.fileNavigationHistory
+    if (!history.past.length) {
+      return
+    }
+    const target = history.past.at(-1)
+    if (!target) {
+      return
+    }
+    const newPast = history.past.slice(0, -1)
+    const currentActiveFile = s.openFiles.find((f) => f.id === s.activeFileId)
+    const newFuture = currentActiveFile
+      ? [
+          {
+            filePath: currentActiveFile.filePath,
+            worktreeId: currentActiveFile.worktreeId,
+            relativePath: currentActiveFile.relativePath,
+            runtimeEnvironmentId: currentActiveFile.runtimeEnvironmentId
+          },
+          ...history.future
+        ]
+      : history.future
+
+    set({
+      fileNavigationHistory: { past: newPast, future: newFuture }
+    })
+
+    s.openFile(
+      {
+        filePath: target.filePath,
+        relativePath: target.relativePath ?? target.filePath,
+        worktreeId: target.worktreeId,
+        runtimeEnvironmentId: target.runtimeEnvironmentId,
+        language: detectLanguage(target.filePath),
+        mode: 'edit'
+      },
+      { preview: false, focusEditor: true }
+    )
+  },
+
+  navigateFileForward: () => {
+    const s = get()
+    const history = s.fileNavigationHistory
+    if (!history.future.length) {
+      return
+    }
+    const target = history.future[0]
+    const newFuture = history.future.slice(1)
+    const currentActiveFile = s.openFiles.find((f) => f.id === s.activeFileId)
+    const newPast = currentActiveFile
+      ? [
+          ...history.past,
+          {
+            filePath: currentActiveFile.filePath,
+            worktreeId: currentActiveFile.worktreeId,
+            relativePath: currentActiveFile.relativePath,
+            runtimeEnvironmentId: currentActiveFile.runtimeEnvironmentId
+          }
+        ]
+      : history.past
+
+    set({
+      fileNavigationHistory: { past: newPast, future: newFuture }
+    })
+
+    s.openFile(
+      {
+        filePath: target.filePath,
+        relativePath: target.relativePath ?? target.filePath,
+        worktreeId: target.worktreeId,
+        runtimeEnvironmentId: target.runtimeEnvironmentId,
+        language: detectLanguage(target.filePath),
+        mode: 'edit'
+      },
+      { preview: false, focusEditor: true }
+    )
   },
 
   setActiveFile: (fileId) => {
