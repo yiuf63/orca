@@ -302,31 +302,49 @@ const markdownPreviewSanitizeSchema = {
   },
   attributes: {
     ...defaultSchema.attributes,
-    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'id'],
+    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'id', 'align', 'style'],
     a: [...(defaultSchema.attributes?.a ?? []), 'href', 'title'],
     code: [
       ...(defaultSchema.attributes?.code ?? []),
       ['className', /^language-[\w-]+$/, 'math-inline', 'math-display']
     ],
-    div: [...(defaultSchema.attributes?.div ?? []), ['className', /^language-[\w-]+$/], 'align'],
+    div: [
+      ...(defaultSchema.attributes?.div ?? []),
+      ['className', /^language-[\w-]+$/],
+      'align',
+      'style'
+    ],
+    p: [...(defaultSchema.attributes?.p ?? []), 'align', 'style'],
     details: [
       ...(defaultSchema.attributes?.details ?? []),
       'open',
       ['className', 'orca-details'],
       ['dataOrcaToggle', 'heading-1', 'heading-2', 'heading-3', 'heading-4', 'heading-5']
     ],
-    h1: [...(defaultSchema.attributes?.h1 ?? []), 'id'],
-    h2: [...(defaultSchema.attributes?.h2 ?? []), 'id'],
-    h3: [...(defaultSchema.attributes?.h3 ?? []), 'id'],
-    h4: [...(defaultSchema.attributes?.h4 ?? []), 'id'],
-    h5: [...(defaultSchema.attributes?.h5 ?? []), 'id'],
-    h6: [...(defaultSchema.attributes?.h6 ?? []), 'id'],
-    img: [...(defaultSchema.attributes?.img ?? []), 'src', 'alt', 'title', 'width', 'height'],
+    h1: [...(defaultSchema.attributes?.h1 ?? []), 'id', 'align', 'style'],
+    h2: [...(defaultSchema.attributes?.h2 ?? []), 'id', 'align', 'style'],
+    h3: [...(defaultSchema.attributes?.h3 ?? []), 'id', 'align', 'style'],
+    h4: [...(defaultSchema.attributes?.h4 ?? []), 'id', 'align', 'style'],
+    h5: [...(defaultSchema.attributes?.h5 ?? []), 'id', 'align', 'style'],
+    h6: [...(defaultSchema.attributes?.h6 ?? []), 'id', 'align', 'style'],
+    img: [
+      ...(defaultSchema.attributes?.img ?? []),
+      'src',
+      'alt',
+      'title',
+      'width',
+      'height',
+      'align',
+      'style'
+    ],
     input: [...(defaultSchema.attributes?.input ?? []), 'type', 'checked', 'disabled'],
     pre: [...(defaultSchema.attributes?.pre ?? []), ['className', /^language-[\w-]+$/]],
-    span: [...(defaultSchema.attributes?.span ?? []), ['className', /^hljs(?:-[\w-]+)?$/]],
-    td: [...(defaultSchema.attributes?.td ?? []), 'align'],
-    th: [...(defaultSchema.attributes?.th ?? []), 'align']
+    span: [...(defaultSchema.attributes?.span ?? []), ['className', /^hljs(?:-[\w-]+)?$/], 'style'],
+    kbd: ['class', 'className', 'style'],
+    sub: ['class', 'className', 'style'],
+    sup: ['class', 'className', 'style'],
+    td: [...(defaultSchema.attributes?.td ?? []), 'align', 'style'],
+    th: [...(defaultSchema.attributes?.th ?? []), 'align', 'style']
   }
 }
 
