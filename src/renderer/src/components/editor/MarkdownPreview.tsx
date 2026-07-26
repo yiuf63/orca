@@ -29,7 +29,12 @@ import {
   CornerDownLeft,
   MessageSquare,
   Plus,
-  X
+  X,
+  Info,
+  Lightbulb,
+  AlertCircle,
+  AlertTriangle,
+  OctagonAlert
 } from 'lucide-react'
 import type { Components, Options as ReactMarkdownOptions } from 'react-markdown'
 import { Button } from '@/components/ui/button'
@@ -524,6 +529,68 @@ export function getMarkdownPreviewSourceRelativePath(
   sourceWorktreePath: string
 ): string | null {
   return relativePathInsideRoot(sourceWorktreePath, filePath)
+}
+type AlertType = 'note' | 'tip' | 'important' | 'warning' | 'caution'
+
+type AlertConfig = {
+  type: AlertType
+  title: string
+  Icon: React.ComponentType<{ className?: string; size?: number }>
+}
+
+const ALERT_CONFIGS: Record<string, AlertConfig> = {
+  NOTE: { type: 'note', title: 'Note', Icon: Info },
+  TIP: { type: 'tip', title: 'Tip', Icon: Lightbulb },
+  IMPORTANT: { type: 'important', title: 'Important', Icon: AlertCircle },
+  WARNING: { type: 'warning', title: 'Warning', Icon: AlertTriangle },
+  CAUTION: { type: 'caution', title: 'Caution', Icon: OctagonAlert }
+}
+
+function parseGitHubAlert(
+  children: React.ReactNode
+): { config: AlertConfig; content: React.ReactNode } | null {
+  const childrenArray = React.Children.toArray(children)
+  if (childrenArray.length === 0) {
+    return null
+  }
+
+  const firstChild = childrenArray[0]
+  if (!React.isValidElement(firstChild) || firstChild.type !== 'p') {
+    return null
+  }
+
+  const pProps = firstChild.props as { children?: React.ReactNode }
+  const pChildren = React.Children.toArray(pProps.children)
+  if (pChildren.length === 0) {
+    return null
+  }
+
+  const firstText = pChildren[0]
+  if (typeof firstText !== 'string') {
+    return null
+  }
+
+  const match = firstText.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i)
+  if (!match) {
+    return null
+  }
+
+  const alertKey = match[1].toUpperCase()
+  const config = ALERT_CONFIGS[alertKey]
+  if (!config) {
+    return null
+  }
+
+  const remainingText = firstText.slice(match[0].length).replace(/^[\r\n\s]+/, '')
+  const newPChildren = remainingText ? [remainingText, ...pChildren.slice(1)] : pChildren.slice(1)
+
+  const modifiedFirstChild = React.cloneElement(firstChild, {}, ...newPChildren)
+  const remainingChildren = [modifiedFirstChild, ...childrenArray.slice(1)]
+
+  return {
+    config,
+    content: remainingChildren
+  }
 }
 
 export default function MarkdownPreview({
@@ -1717,12 +1784,30 @@ export default function MarkdownPreview({
       },
       p: ({ node, children, ...props }) =>
         wrapAnnotatedBlock('p', node as MarkdownPreviewPositionNode, <p {...props}>{children}</p>),
-      blockquote: ({ node, children, ...props }) =>
-        wrapAnnotatedBlock(
+      blockquote: ({ node, children, ...props }) => {
+        const alertData = parseGitHubAlert(children)
+        if (alertData) {
+          const { config, content } = alertData
+          const { type, title, Icon } = config
+          return wrapAnnotatedBlock(
+            'blockquote',
+            node as MarkdownPreviewPositionNode,
+            <div className={`github-alert github-alert-${type}`}>
+              <div className="github-alert-title">
+                <Icon size={16} />
+                <span>{title}</span>
+              </div>
+              <div className="github-alert-content">{content}</div>
+            </div>
+          )
+        }
+
+        return wrapAnnotatedBlock(
           'blockquote',
           node as MarkdownPreviewPositionNode,
           <blockquote {...props}>{children}</blockquote>
-        ),
+        )
+      },
       table: ({ node, children, ...props }) =>
         wrapAnnotatedBlock(
           'table',
