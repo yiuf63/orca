@@ -1521,3 +1521,62 @@
 .markdown-preview p[align='right'] {
   text-align: right;
 }
+
+/* ── GitHub Flavored Markdown Alerts ───────────── */
+.github-alert {
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  border-left: 4px solid var(--alert-border-color, #3b82f6);
+  background-color: var(--alert-bg-color, rgba(59, 130, 246, 0.08));
+  border-radius: 0 6px 6px 0;
+}
+
+.github-alert-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9em;
+  color: var(--alert-title-color, #3b82f6);
+  margin-bottom: 0.35rem;
+}
+
+.github-alert-content {
+  font-size: 0.95em;
+  line-height: 1.5;
+  color: var(--foreground);
+}
+
+.github-alert-content p:last-child {
+  margin-bottom: 0;
+}
+
+.github-alert-note {
+  --alert-border-color: #3b82f6;
+  --alert-title-color: #3b82f6;
+  --alert-bg-color: rgba(59, 130, 246, 0.08);
+}
+
+.github-alert-tip {
+  --alert-border-color: #10b981;
+  --alert-title-color: #10b981;
+  --alert-bg-color: rgba(16, 185, 129, 0.08);
+}
+
+.github-alert-important {
+  --alert-border-color: #8b5cf6;
+  --alert-title-color: #8b5cf6;
+  --alert-bg-color: rgba(139, 92, 246, 0.08);
+}
+
+.github-alert-warning {
+  --alert-border-color: #f59e0b;
+  --alert-title-color: #f59e0b;
+  --alert-bg-color: rgba(245, 158, 11, 0.08);
+}
+
+.github-alert-caution {
+  --alert-border-color: #ef4444;
+  --alert-title-color: #ef4444;
+  --alert-bg-color: rgba(239, 68, 68, 0.08);
+}
