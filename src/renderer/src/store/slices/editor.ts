@@ -543,22 +543,6 @@ export type EditorSlice = {
   /** Most recently closed editor tabs per worktree (for Cmd/Ctrl+Shift+T). */
   recentlyClosedEditorTabsByWorktree: Record<string, ClosedEditorTabSnapshot[]>
   reopenClosedEditorTab: (worktreeId: string) => boolean
-  fileNavigationHistory: {
-    past: {
-      filePath: string
-      worktreeId: string
-      relativePath?: string
-      runtimeEnvironmentId?: string | null
-    }[]
-    future: {
-      filePath: string
-      worktreeId: string
-      relativePath?: string
-      runtimeEnvironmentId?: string | null
-    }[]
-  }
-  navigateFileBack: () => void
-  navigateFileForward: () => void
   setActiveFile: (fileId: string) => void
   reorderFiles: (fileIds: string[]) => void
   markFileDirty: (fileId: string, dirty: boolean) => void
