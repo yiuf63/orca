@@ -415,6 +415,9 @@ export type EditorSlice = {
   clearEditorDraft: (fileId: string) => void
   clearEditorDrafts: (fileIds: string[]) => void
 
+  // Global preferred Markdown view mode across files
+  preferredMarkdownViewMode: MarkdownViewMode
+
   // Markdown view mode per file (fileId -> mode)
   markdownViewMode: Record<string, MarkdownViewMode>
   setMarkdownViewMode: (fileId: string, mode: MarkdownViewMode) => void
@@ -1488,10 +1491,12 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
     }),
 
   // Markdown view mode
+  preferredMarkdownViewMode: 'rich' as MarkdownViewMode,
   markdownViewMode: {},
   setMarkdownViewMode: (fileId, mode) =>
     set((s) => ({
-      markdownViewMode: { ...s.markdownViewMode, [fileId]: mode }
+      markdownViewMode: { ...s.markdownViewMode, [fileId]: mode },
+      preferredMarkdownViewMode: mode
     })),
 
   // Editor view mode (edit vs changes-diff). See EditorViewMode.

@@ -43,7 +43,7 @@ export function getEditorToggleModes(target: MarkdownPreviewTarget): readonly Ed
 
 export function getMarkdownViewModes(target: MarkdownPreviewTarget): readonly MarkdownViewMode[] {
   if (target.language === 'markdown') {
-    if (target.mode === 'edit') {
+    if (target.mode === 'edit' || target.mode === 'markdown-preview') {
       return MARKDOWN_EDIT_VIEW_MODES
     }
     if (

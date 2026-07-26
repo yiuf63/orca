@@ -128,6 +128,7 @@ function EditorPanelInner({
     handleRenameConfirm
   } = useUntitledFileRename({ openFiles, clearUntitled })
 
+  const preferredMarkdownViewMode = useAppStore((s) => s.preferredMarkdownViewMode)
   useClosedEditorTabCleanup(openFiles)
   useMarkdownPreviewShortcut({ activeFile, panelRef, openMarkdownPreview })
 
@@ -242,6 +243,7 @@ function EditorPanelInner({
     gitStatusEntries,
     gitBranchEntries,
     markdownViewMode,
+    preferredMarkdownViewMode,
     isChangesMode
   })
 

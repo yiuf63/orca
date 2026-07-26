@@ -25,6 +25,7 @@ type EditorPanelRenderModelParams = {
   gitStatusEntries: StoreState['gitStatusByWorktree'][string] | undefined
   gitBranchEntries: StoreState['gitBranchChangesByWorktree'][string] | undefined
   markdownViewMode: StoreState['markdownViewMode']
+  preferredMarkdownViewMode?: MarkdownViewMode
   isChangesMode: boolean
 }
 
@@ -35,6 +36,7 @@ export function getEditorPanelRenderModel({
   gitStatusEntries,
   gitBranchEntries,
   markdownViewMode,
+  preferredMarkdownViewMode,
   isChangesMode
 }: EditorPanelRenderModelParams) {
   const isSingleDiff =
@@ -96,12 +98,16 @@ export function getEditorPanelRenderModel({
     diffSource: activeFile.diffSource
   })
   const storedMarkdownViewMode = markdownViewMode[activeFile.id]
+  const fallbackViewMode =
+    preferredMarkdownViewMode && markdownViewModes.includes(preferredMarkdownViewMode)
+      ? preferredMarkdownViewMode
+      : defaultMarkdownViewMode
   const mdViewMode: MarkdownViewMode =
     hasViewModeToggle &&
     storedMarkdownViewMode !== undefined &&
     markdownViewModes.includes(storedMarkdownViewMode)
       ? storedMarkdownViewMode
-      : defaultMarkdownViewMode
+      : fallbackViewMode
   const editorToggleModes = getEditorToggleModes({
     language: viewerLanguage,
     mode: activeFile.mode,
