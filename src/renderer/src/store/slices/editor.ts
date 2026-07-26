@@ -505,6 +505,22 @@ export type EditorSlice = {
       sourceOwner?: HttpLinkSourceOwner
     }
   ) => Promise<void>
+  fileNavigationHistory: {
+    past: {
+      filePath: string
+      worktreeId: string
+      relativePath?: string
+      runtimeEnvironmentId?: string | null
+    }[]
+    future: {
+      filePath: string
+      worktreeId: string
+      relativePath?: string
+      runtimeEnvironmentId?: string | null
+    }[]
+  }
+  navigateFileBack: () => void
+  navigateFileForward: () => void
   openMarkdownPreview: (
     file: Pick<
       OpenFile,
@@ -4991,6 +5007,24 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
           )
           return
         }
+      }
+
+      const currentActive = get().openFiles.find((f) => f.id === get().activeFileId)
+      if (currentActive) {
+        set((s) => ({
+          fileNavigationHistory: {
+            past: [
+              ...s.fileNavigationHistory.past,
+              {
+                filePath: currentActive.filePath,
+                worktreeId: currentActive.worktreeId,
+                relativePath: currentActive.relativePath,
+                runtimeEnvironmentId: currentActive.runtimeEnvironmentId
+              }
+            ],
+            future: []
+          }
+        }))
       }
 
       get().openFile(
