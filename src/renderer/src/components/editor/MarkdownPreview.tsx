@@ -592,44 +592,49 @@ function parseGitHubAlert(
   if (childrenArray.length === 0) {
     return null
   }
-
   const firstChild = childrenArray[0]
-  if (!React.isValidElement(firstChild) || firstChild.type !== 'p') {
+  let text: string | null = null
+  const remainingChildren = childrenArray.slice(1)
+  if (typeof firstChild === 'string') {
+    text = firstChild
+  } else if (React.isValidElement(firstChild)) {
+    const element = firstChild as React.ReactElement<{ children?: React.ReactNode }>
+    const elementChildren = React.Children.toArray(element.props.children ?? [])
+    if (elementChildren.length === 0) {
+      return null
+    }
+    const possible = elementChildren[0]
+    if (typeof possible !== 'string') {
+      return null
+    }
+    text = possible
+  } else {
     return null
   }
-
-  const pProps = firstChild.props as { children?: React.ReactNode }
-  const pChildren = React.Children.toArray(pProps.children)
-  if (pChildren.length === 0) {
-    return null
-  }
-
-  const firstText = pChildren[0]
-  if (typeof firstText !== 'string') {
-    return null
-  }
-
-  const match = firstText.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i)
+  const trimmed = text.trimStart()
+  const match = trimmed.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i)
   if (!match) {
     return null
   }
-
-  const alertKey = match[1].toUpperCase()
-  const config = ALERT_CONFIGS[alertKey]
+  const key = match[1].toUpperCase()
+  const config = ALERT_CONFIGS[key]
   if (!config) {
     return null
   }
-
-  const remainingText = firstText.slice(match[0].length).replace(/^[\r\n\s]+/, '')
-  const newPChildren = remainingText ? [remainingText, ...pChildren.slice(1)] : pChildren.slice(1)
-
-  const modifiedFirstChild = React.cloneElement(firstChild, {}, ...newPChildren)
-  const remainingChildren = [modifiedFirstChild, ...childrenArray.slice(1)]
-
-  return {
-    config,
-    content: remainingChildren
+  const remainingText = trimmed.slice(match[0].length).replace(/^[\r\n\s]+/, '')
+  let newChildren: React.ReactNode[]
+  if (typeof firstChild === 'string') {
+    newChildren = remainingText ? [remainingText, ...remainingChildren] : remainingChildren
+  } else {
+    const element = firstChild as React.ReactElement<{ children?: React.ReactNode }>
+    const original = React.Children.toArray(element.props.children ?? [])
+    const newElemChildren = remainingText
+      ? [remainingText, ...original.slice(1)]
+      : original.slice(1)
+    const modified = React.cloneElement(element, element.props, ...newElemChildren)
+    newChildren = [modified, ...remainingChildren]
   }
+  return { config, content: newChildren }
 }
 
 export default function MarkdownPreview({
