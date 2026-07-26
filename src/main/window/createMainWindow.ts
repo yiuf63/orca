@@ -310,6 +310,15 @@ export function createMainWindow(
     mainWindow.on('session-end', markSystemSessionEnding)
   }
 
+  // Mouse4 (browser-backward) and Mouse5 (browser-forward) hardware side buttons emit app-command events on Windows/Linux.
+  mainWindow.on('app-command', (_event, command) => {
+    if (command === 'browser-backward') {
+      mainWindow.webContents.send('editor:navigate-back')
+    } else if (command === 'browser-forward') {
+      mainWindow.webContents.send('editor:navigate-forward')
+    }
+  })
+
   if (process.platform === 'darwin') {
     // Why: preserve hidden-window power savings; stable native sizing and frame-only invalidation
     // make wake recovery independent of the throttled viewport.

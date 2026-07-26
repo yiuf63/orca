@@ -813,7 +813,10 @@ export default function MarkdownPreview({
     [unsentMarkdownReviewNotes, unsentMarkdownReviewPrompt]
   )
   const canShowReviewTools = Boolean(
-    markdownAnnotationsEnabled && sourceWorktree && sourceRelativePath !== null
+    markdownAnnotationsEnabled &&
+    sourceWorktree &&
+    sourceRelativePath !== null &&
+    markdownReviewNotes.length > 0
   )
 
   // Why: split panes share the file but each needs its own scroll viewport, so the caller passes a pane-scoped cache key.
