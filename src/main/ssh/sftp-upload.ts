@@ -29,7 +29,11 @@ export function uploadFile(
   sftp: SFTPWrapper,
   localPath: string,
   remotePath: string,
-  options?: { exclusive?: boolean; signal?: AbortSignal }
+  options?: {
+    exclusive?: boolean
+    signal?: AbortSignal
+    onProgress?: (progress: { bytesTransferred: number }) => void
+  }
 ): Promise<void> {
   return uploadFileAndJoinTeardown(sftp, localPath, remotePath, options)
 }
@@ -38,7 +42,11 @@ async function uploadFileAndJoinTeardown(
   sftp: SFTPWrapper,
   localPath: string,
   remotePath: string,
-  options?: { exclusive?: boolean; signal?: AbortSignal }
+  options?: {
+    exclusive?: boolean
+    signal?: AbortSignal
+    onProgress?: (progress: { bytesTransferred: number }) => void
+  }
 ): Promise<void> {
   const handle = await open(localPath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
   let handleClose: Promise<void> | undefined
@@ -68,6 +76,11 @@ async function uploadFileAndJoinTeardown(
       flags: options?.exclusive ? 'wx' : 'w'
     })
     readStream = handle.createReadStream({ autoClose: false })
+    let bytesTransferred = 0
+    readStream.on('data', (chunk: Buffer | string) => {
+      bytesTransferred += Buffer.isBuffer(chunk) ? chunk.byteLength : Buffer.byteLength(chunk)
+      options?.onProgress?.({ bytesTransferred })
+    })
     const abortTransfer = (): void => {
       const reason =
         options?.signal?.reason instanceof Error

@@ -375,6 +375,37 @@ describe('RuntimeFileCommands', () => {
     expect(statMock).not.toHaveBeenCalledWith('/repo/linked-docs')
   })
 
+  it('rejects oversized SSH file explorer text previews before reading content', async () => {
+    const { commands, store } = createRuntimeFileCommands({ path: '/repo' })
+    store.getRepo.mockReturnValue({ connectionId: 'ssh-1' })
+    const stat = vi.fn().mockResolvedValue({ size: 600 * 1024, type: 'file', mtime: 1 })
+    const readFile = vi.fn()
+    vi.mocked(getSshFilesystemProvider).mockReturnValue({ stat, readFile } as never)
+
+    await expect(commands.readFileExplorerPreview('id:wt-1', 'logs/big.txt')).rejects.toThrow(
+      'file_too_large'
+    )
+
+    expect(stat).toHaveBeenCalledWith('/repo/logs/big.txt')
+    expect(readFile).not.toHaveBeenCalled()
+  })
+
+  it('reads SSH file explorer chunks through the filesystem provider', async () => {
+    const { commands, store } = createRuntimeFileCommands({ path: '/repo' })
+    store.getRepo.mockReturnValue({ connectionId: 'ssh-1' })
+    const stat = vi.fn().mockResolvedValue({ size: 10, type: 'file', mtime: 1 })
+    const readFileChunk = vi.fn().mockResolvedValue(Buffer.from('hello'))
+    vi.mocked(getSshFilesystemProvider).mockReturnValue({ stat, readFileChunk } as never)
+
+    await expect(commands.readFileExplorerChunk('id:wt-1', 'logs/big.txt', 0, 5)).resolves.toEqual({
+      contentBase64: 'aGVsbG8=',
+      bytesRead: 5,
+      eof: false
+    })
+
+    expect(readFileChunk).toHaveBeenCalledWith('/repo/logs/big.txt', 0, 5)
+  })
+
   it('renames a runtime-local file when destination does not exist', async () => {
     const { commands } = createRuntimeFileCommands()
     resolveAuthorizedPathMock.mockImplementation(async (p: string) => p)

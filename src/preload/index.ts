@@ -157,6 +157,7 @@ import type {
 } from '../shared/rate-limit-types'
 import type { WorkspaceSpaceScanProgress } from '../shared/workspace-space-types'
 import type { WorkspaceCleanupScanProgress } from '../shared/workspace-cleanup'
+import type { FileUploadProgressEvent } from '../shared/file-upload-progress'
 import type { WorkspacePortAdvertisedUrlChangedEvent } from '../shared/workspace-ports'
 import type { GhAuthDiagnostic } from '../shared/github-auth-types'
 import type { TaskSourceContext } from '../shared/task-source-context'
@@ -3192,6 +3193,7 @@ const api = {
         destDir: string
         connectionId?: string
         ensureDir?: boolean
+        progressId?: string
       } & SshMutationExpectation
     ): Promise<{
       results: (
@@ -3245,6 +3247,7 @@ const api = {
         paths: string[]
         worktreePath: string
         connectionId?: string
+        progressId?: string
       } & SshMutationExpectation
     ): Promise<{
       resolvedPaths: string[]
@@ -3263,6 +3266,12 @@ const api = {
         callback(payload)
       ipcRenderer.on('fs:changed', listener)
       return () => ipcRenderer.removeListener('fs:changed', listener)
+    },
+    onUploadProgress: (callback: (progress: FileUploadProgressEvent) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, progress: FileUploadProgressEvent) =>
+        callback(progress)
+      ipcRenderer.on('fs:uploadProgress', listener)
+      return () => ipcRenderer.removeListener('fs:uploadProgress', listener)
     }
   },
 

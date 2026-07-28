@@ -6,6 +6,7 @@ export type SftpFactory = () => Promise<SFTPWrapper>
 
 export type SshRawTransferOptions = {
   downloadFile?: (sourcePath: string, destinationPath: string) => Promise<void>
+  readFileChunk?: (sourcePath: string, offset: number, length: number) => Promise<Buffer>
   openFileUploadSession?: () => Promise<FileUploadSession>
   writeBuffer?: (
     remotePath: string,

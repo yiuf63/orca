@@ -3,6 +3,18 @@ import { isAbsolute, join, relative, sep } from 'node:path'
 import type { FileUploadSession, IFilesystemProvider } from '../providers/types'
 import { assertSafeRemotePathSegment, type RemotePathFlavor } from '../ssh/ssh-remote-platform'
 
+export type SshImportDirectoryScan = {
+  hasSymlink: boolean
+  fileCount: number
+  totalBytes: number
+}
+
+export type SshImportDirectoryUploadProgress = {
+  onFileStart?: (localPath: string, byteLength: number) => void
+  onFileProgress?: (bytesTransferred: number) => void
+  onFileComplete?: () => void
+}
+
 export async function captureLocalUploadRoot(
   sourcePath: string,
   sourceStat: Awaited<ReturnType<typeof lstat>>
@@ -22,21 +34,33 @@ export async function captureLocalUploadRoot(
 export async function preScanSshImportDirectory(
   dirPath: string,
   remotePathFlavor: RemotePathFlavor
-): Promise<boolean> {
+): Promise<SshImportDirectoryScan> {
+  const scan: SshImportDirectoryScan = { hasSymlink: false, fileCount: 0, totalBytes: 0 }
   const entries = await readdir(dirPath, { withFileTypes: true })
   for (const entry of entries) {
     assertSafeRemotePathSegment(entry.name, remotePathFlavor)
     if (entry.isSymbolicLink()) {
-      return true
+      scan.hasSymlink = true
+      return scan
     }
+    const childPath = join(dirPath, entry.name)
     if (entry.isDirectory()) {
-      const childPath = join(dirPath, entry.name)
-      if (await preScanSshImportDirectory(childPath, remotePathFlavor)) {
-        return true
+      const childScan = await preScanSshImportDirectory(childPath, remotePathFlavor)
+      scan.fileCount += childScan.fileCount
+      scan.totalBytes += childScan.totalBytes
+      if (childScan.hasSymlink) {
+        scan.hasSymlink = true
+        return scan
       }
+      continue
+    }
+    if (entry.isFile()) {
+      const statResult = await lstat(childPath)
+      scan.fileCount += 1
+      scan.totalBytes += statResult.size
     }
   }
-  return false
+  return scan
 }
 
 export async function uploadSshImportDirectory(
@@ -46,7 +70,8 @@ export async function uploadSshImportDirectory(
   remoteDir: string,
   rootRealPath: string,
   remotePathFlavor: RemotePathFlavor,
-  assertCurrent?: () => void
+  assertCurrent?: () => void,
+  progress?: SshImportDirectoryUploadProgress
 ): Promise<void> {
   await assertLocalUploadPathInsideRoot(rootRealPath, localDir)
   const entries = await readdir(localDir, { withFileTypes: true })
@@ -73,12 +98,20 @@ export async function uploadSshImportDirectory(
         remotePath,
         rootRealPath,
         remotePathFlavor,
-        assertCurrent
+        assertCurrent,
+        progress
       )
       continue
     }
     assertCurrent?.()
-    await uploadSession.uploadFile(localPath, remotePath, { exclusive: true })
+    progress?.onFileStart?.(localPath, statResult.size)
+    await uploadSession.uploadFile(localPath, remotePath, {
+      exclusive: true,
+      ...(progress?.onFileProgress
+        ? { onProgress: (event) => progress.onFileProgress?.(event.bytesTransferred) }
+        : {})
+    })
+    progress?.onFileComplete?.()
   }
 }
 

@@ -15043,6 +15043,12 @@
     }
   },
   "components": {
+    "fileUploadProgress": {
+      "initial": "Uploading {{value0}} file{{value1}} to {{value2}}...",
+      "scanning": "Preparing upload to {{value0}}...",
+      "complete": "Upload complete",
+      "uploading": "Uploading {{value0}}/{{value1}} files to {{value2}} - {{value3}}% - {{value4}}"
+    },
     "native-chat": {
       "composer": {
         "imageUnsupported": "Image paste is not supported for this agent.",

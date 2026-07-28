@@ -16,6 +16,7 @@ import type {
   DashboardSnapshot,
   DashboardSpawnAgentArgs
 } from '../shared/dashboard-snapshot'
+import type { FileUploadProgressEvent } from '../shared/file-upload-progress'
 import type {
   TerminalPreviewConnectResult,
   TerminalPreviewDataPayload
@@ -2864,6 +2865,7 @@ export type PreloadApi = {
         destDir: string
         connectionId?: string
         ensureDir?: boolean
+        progressId?: string
       } & SshMutationExpectation
     ) => Promise<{
       results: (
@@ -2915,6 +2917,7 @@ export type PreloadApi = {
         paths: string[]
         worktreePath: string
         connectionId?: string
+        progressId?: string
       } & SshMutationExpectation
     ) => Promise<{
       resolvedPaths: string[]
@@ -2927,6 +2930,7 @@ export type PreloadApi = {
     watchWorktree: (args: { worktreePath: string; connectionId?: string }) => Promise<void>
     unwatchWorktree: (args: { worktreePath: string; connectionId?: string }) => Promise<void>
     onFsChanged: (callback: (payload: FsChangedPayload) => void) => () => void
+    onUploadProgress: (callback: (progress: FileUploadProgressEvent) => void) => () => void
   }
   git: {
     status: (args: {

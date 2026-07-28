@@ -1044,6 +1044,10 @@ export class SshRelaySession {
           this.requireReadyConnection().downloadFile(sourcePath, destinationPath, {
             hostPlatform
           }),
+        readFileChunk: (sourcePath, offset, length) =>
+          this.requireReadyConnection().readFileChunk(sourcePath, offset, length, {
+            hostPlatform
+          }),
         openFileUploadSession: () =>
           this.requireReadyConnection().openFileUploadSession({
             hostPlatform

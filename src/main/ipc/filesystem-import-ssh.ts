@@ -7,6 +7,8 @@ import type { FileUploadSession, IFilesystemProvider } from '../providers/types'
 import type { ImportItemResult } from './filesystem-mutations'
 import { assertSafeRemotePathSegment, type RemotePathFlavor } from '../ssh/ssh-remote-platform'
 import { isWindowsAbsolutePathLike } from '../../shared/cross-platform-path'
+import type { FileUploadProgressUpdate } from '../../shared/file-upload-progress'
+import { SshImportProgress } from './filesystem-import-ssh-progress'
 import {
   captureLocalUploadRoot,
   preScanSshImportDirectory,
@@ -19,7 +21,11 @@ export async function importExternalPathsSsh(
   sourcePaths: string[],
   destDir: string,
   connectionId: string,
-  options?: { ensureDir?: boolean; assertCurrent?: () => void }
+  options?: {
+    ensureDir?: boolean
+    assertCurrent?: () => void
+    onProgress?: (progress: FileUploadProgressUpdate) => void
+  }
 ): Promise<{ results: ImportItemResult[] }> {
   if (sourcePaths.length === 0) {
     return { results: [] }
@@ -55,10 +61,13 @@ export async function importExternalPathsSsh(
   }
   options?.assertCurrent?.()
   const uploadSession = await provider.openFileUploadSession()
+  const progress = options?.onProgress ? new SshImportProgress(options.onProgress) : undefined
+  progress?.emitScanning()
   // Why: filename legality follows the remote filesystem, not the client's OS.
   const remotePathFlavor: RemotePathFlavor = isWindowsAbsolutePathLike(destDir)
     ? 'windows'
     : 'posix'
+  let completed = false
   try {
     for (const sourcePath of sourcePaths) {
       const result = await importOneSourceSsh(
@@ -68,7 +77,8 @@ export async function importExternalPathsSsh(
         destDir,
         reservedNames,
         remotePathFlavor,
-        options?.assertCurrent
+        options?.assertCurrent,
+        progress
       )
       results.push(result)
       if (result.status === 'imported') {
@@ -78,7 +88,11 @@ export async function importExternalPathsSsh(
         reservedNames.add(posix.basename(result.destPath))
       }
     }
+    completed = true
   } finally {
+    if (completed) {
+      progress?.emitComplete()
+    }
     uploadSession.close()
   }
 
@@ -92,7 +106,8 @@ async function importOneSourceSsh(
   destDir: string,
   reservedNames: Set<string>,
   remotePathFlavor: RemotePathFlavor,
-  assertCurrent?: () => void
+  assertCurrent?: () => void,
+  progress?: SshImportProgress
 ): Promise<ImportItemResult> {
   const resolvedSource = resolve(sourcePath)
 
@@ -144,8 +159,14 @@ async function importOneSourceSsh(
   let createdDestDir: string | null = null
   try {
     const rootRealPath = isDir ? await captureLocalUploadRoot(resolvedSource, sourceStat) : null
-    if (isDir && (await preScanSshImportDirectory(resolvedSource, remotePathFlavor))) {
-      return { sourcePath, status: 'skipped', reason: 'symlink' }
+    if (isDir) {
+      const scan = await preScanSshImportDirectory(resolvedSource, remotePathFlavor)
+      if (scan.hasSymlink) {
+        return { sourcePath, status: 'skipped', reason: 'symlink' }
+      }
+      progress?.addBudget(scan.fileCount, scan.totalBytes)
+    } else {
+      progress?.addBudget(1, sourceStat.size)
     }
 
     // Why: local inspection can outlive a HUB SSH session; revalidate before the first remote write.
@@ -171,11 +192,23 @@ async function importOneSourceSsh(
         destPath,
         rootRealPath!,
         remotePathFlavor,
-        assertCurrent
+        assertCurrent,
+        progress
+          ? {
+              onFileStart: (localPath, byteLength) => progress.startFile(localPath, byteLength),
+              onFileProgress: (bytesTransferred) => progress.updateFile(bytesTransferred),
+              onFileComplete: () => progress.completeFile()
+            }
+          : undefined
       )
     } else {
       assertCurrent?.()
-      await uploadSession.uploadFile(resolvedSource, destPath, { exclusive: true })
+      progress?.startFile(resolvedSource, sourceStat.size)
+      await uploadSession.uploadFile(resolvedSource, destPath, {
+        exclusive: true,
+        ...(progress ? { onProgress: (event) => progress.updateFile(event.bytesTransferred) } : {})
+      })
+      progress?.completeFile()
     }
 
     return {
@@ -186,6 +219,7 @@ async function importOneSourceSsh(
       renamed
     }
   } catch (error) {
+    progress?.clearCurrentFile()
     if (createdDestDir) {
       // Why: local directory imports roll back partial output; SSH imports
       // should not leave the no-clobber root after a nested upload failure.

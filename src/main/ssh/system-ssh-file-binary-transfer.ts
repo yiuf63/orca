@@ -1,6 +1,6 @@
 import { constants, createWriteStream } from 'node:fs'
 import { lstat, open } from 'node:fs/promises'
-import type { Writable } from 'node:stream'
+import { Writable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { SshTarget } from '../../shared/ssh-types'
 import { shellEscape } from './ssh-connection-utils'
@@ -29,6 +29,7 @@ type SystemSshWriteBufferOptions = SystemSshOperationOptions & {
 
 type SystemSshUploadFileOptions = SystemSshOperationOptions & {
   exclusive?: boolean
+  onProgress?: (progress: { bytesTransferred: number }) => void
 }
 
 export async function downloadFileViaSystemSsh(
@@ -131,7 +132,13 @@ export async function uploadFileViaSystemSsh(
       }
     )
     const input = handle.createReadStream({ autoClose: false })
+    let bytesTransferred = 0
+    const onInputData = (chunk: Buffer | string): void => {
+      bytesTransferred += Buffer.isBuffer(chunk) ? chunk.byteLength : Buffer.byteLength(chunk)
+      options?.onProgress?.({ bytesTransferred })
+    }
     try {
+      input.on('data', onInputData)
       await awaitWithSystemSshAbort(
         options?.signal,
         () => {
@@ -147,10 +154,58 @@ export async function uploadFileViaSystemSsh(
       input.destroy()
       channel.close()
       throw error
+    } finally {
+      input.off('data', onInputData)
     }
   } finally {
     await handle.close()
   }
+}
+
+export async function readFileChunkViaSystemSsh(
+  target: SshTarget,
+  remotePath: string,
+  offset: number,
+  length: number,
+  options?: SystemSshOperationOptions
+): Promise<Buffer> {
+  throwIfAborted(options?.signal)
+  if (length <= 0) {
+    return Buffer.alloc(0)
+  }
+  const isWindows = options?.hostPlatform && isWindowsRemoteHost(options.hostPlatform)
+  const channel = spawnSystemSshCommand(
+    target,
+    isWindows
+      ? makeWindowsReadFileChunkCommand(remotePath, offset, length)
+      : makePosixReadFileChunkCommand(remotePath, offset, length),
+    {
+      wrapCommand: !isWindows,
+      ...getSystemSshBuildArgsFromOperationOptions(options)
+    }
+  )
+  const chunks: Buffer[] = []
+  const sink = new Writable({
+    write(chunk, _encoding, callback) {
+      chunks.push(Buffer.from(chunk))
+      callback()
+    }
+  })
+  try {
+    await awaitWithSystemSshAbort(
+      options?.signal,
+      () => {
+        channel.close()
+        sink.destroy()
+      },
+      Promise.all([waitForChannelClose(channel, `read ${remotePath}`), pipeline(channel, sink)])
+    )
+  } catch (error) {
+    channel.close()
+    sink.destroy()
+    throw error
+  }
+  return Buffer.concat(chunks)
 }
 
 async function writeBufferViaSystemSshWindows(
@@ -210,6 +265,39 @@ function makeWindowsReadFileCommand(remotePath: string): string {
       '$src = [System.IO.File]::OpenRead($path)',
       '$dst = [Console]::OpenStandardOutput()',
       'try { $src.CopyTo($dst) } finally { $src.Dispose() }'
+    ].join('; ')
+  )
+}
+
+function makePosixReadFileChunkCommand(remotePath: string, offset: number, length: number): string {
+  const blockSize = 65536
+  const blockSkip = Math.floor(offset / blockSize)
+  const byteRemainder = offset % blockSize
+  const bytesToRead = byteRemainder + length
+  const blockCount = Math.ceil(bytesToRead / blockSize)
+  const skipPrefix = byteRemainder > 0 ? ` | tail -c +${byteRemainder + 1}` : ''
+  return `dd if=${shellEscape(remotePath)} bs=${blockSize} skip=${blockSkip} count=${blockCount} 2>/dev/null${skipPrefix} | head -c ${length}`
+}
+
+function makeWindowsReadFileChunkCommand(
+  remotePath: string,
+  offset: number,
+  length: number
+): string {
+  return powerShellCommand(
+    [
+      '$ErrorActionPreference = "Stop"',
+      `$path = ${powerShellLiteral(remotePath)}`,
+      `$offset = [int64]${offset}`,
+      `$count = [int]${length}`,
+      '$buffer = New-Object byte[] $count',
+      '$src = [System.IO.File]::OpenRead($path)',
+      '$dst = [Console]::OpenStandardOutput()',
+      'try {',
+      '  $null = $src.Seek($offset, [System.IO.SeekOrigin]::Begin)',
+      '  $read = $src.Read($buffer, 0, $count)',
+      '  if ($read -gt 0) { $dst.Write($buffer, 0, $read) }',
+      '} finally { $src.Dispose() }'
     ].join('; ')
   )
 }

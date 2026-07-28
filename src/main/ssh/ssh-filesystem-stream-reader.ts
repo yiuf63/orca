@@ -10,7 +10,7 @@ const RESULT_ENCODING_BASE64 = 'base64'
 const SENTINEL_STREAM_ID = -1
 
 const MAX_PREVIEWABLE_BINARY_SIZE = 50 * 1024 * 1024
-const MAX_TEXT_FILE_SIZE = 10 * 1024 * 1024
+const MAX_TEXT_FILE_SIZE = 50 * 1024 * 1024
 
 type StreamMetadataResponse = {
   streamId?: number

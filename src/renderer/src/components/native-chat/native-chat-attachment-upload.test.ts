@@ -7,7 +7,8 @@ const mocks = vi.hoisted(() => ({
   toastDismiss: vi.fn(),
   toastError: vi.fn(),
   toastMessage: vi.fn(),
-  resolveDroppedPathsForAgent: vi.fn()
+  resolveDroppedPathsForAgent: vi.fn(),
+  onUploadProgress: vi.fn(() => vi.fn())
 }))
 
 vi.mock('sonner', () => ({
@@ -145,7 +146,12 @@ describe('uploadNativeChatAttachmentPaths', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.stubGlobal('window', {
-      api: { fs: { resolveDroppedPathsForAgent: mocks.resolveDroppedPathsForAgent } }
+      api: {
+        fs: {
+          resolveDroppedPathsForAgent: mocks.resolveDroppedPathsForAgent,
+          onUploadProgress: mocks.onUploadProgress
+        }
+      }
     })
   })
 
@@ -162,6 +168,7 @@ describe('uploadNativeChatAttachmentPaths', () => {
       paths: ['/local/a.txt'],
       worktreePath: '/remote/worktree',
       connectionId: 'conn-1',
+      progressId: expect.any(String),
       expectedExecutionHostId: 'ssh:conn-1',
       expectedSshTargetId: 'conn-1',
       expectedSshConnectionGeneration: 4

@@ -14,6 +14,7 @@ import {
   stopSshFilesystemWatchRegistration,
   type WatchRegistration
 } from './ssh-filesystem-provider-watch'
+import { readSshFilesystemFileChunk } from './ssh-filesystem-provider-chunk-read'
 import type {
   IFilesystemProvider,
   FileStat,
@@ -107,6 +108,10 @@ export class SshFilesystemProvider implements IFilesystemProvider {
       }
       throw err
     }
+  }
+
+  async readFileChunk(filePath: string, offset: number, length: number): Promise<Buffer> {
+    return readSshFilesystemFileChunk(this.createSftp, this.rawTransfer, filePath, offset, length)
   }
 
   async readTerminalArtifact(

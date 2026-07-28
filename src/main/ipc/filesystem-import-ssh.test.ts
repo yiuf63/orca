@@ -272,4 +272,35 @@ describe('fs:importExternalPaths — SSH routing & connection', () => {
     )
     expect(provider.createDir).toHaveBeenCalledWith('/home/user/project/.orca/drops')
   })
+
+  it('emits sender-scoped upload progress when progressId is provided', async () => {
+    getConnMgrMock.mockReturnValue({ getConnection: () => makeConn() })
+    mockFile('/tmp/dropped/file.txt')
+    uploadSession.uploadFile = vi.fn(async (_source, _dest, options) => {
+      options?.onProgress?.({ bytesTransferred: 12 })
+    })
+    const send = vi.fn()
+
+    await handlers.get('fs:resolveDroppedPathsForAgent')!(
+      { sender: { send } },
+      {
+        paths: ['/tmp/dropped/file.txt'],
+        worktreePath: '/home/user/project',
+        connectionId: connId,
+        progressId: 'upload-1',
+        expectedSshTargetId: connId,
+        expectedSshConnectionGeneration: 0
+      }
+    )
+
+    expect(send).toHaveBeenCalledWith(
+      'fs:uploadProgress',
+      expect.objectContaining({
+        progressId: 'upload-1',
+        phase: 'uploading',
+        transferredBytes: 12,
+        totalBytes: 12
+      })
+    )
+  })
 })

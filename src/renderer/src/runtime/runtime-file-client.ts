@@ -22,6 +22,7 @@ import {
   unwrapRuntimeRpcResult
 } from './runtime-rpc-client'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
+import type { FileUploadProgressUpdate } from '../../../shared/file-upload-progress'
 import { basename, joinPath, normalizeRelativePath } from '@/lib/path'
 import {
   isWindowsAbsolutePathLike,
@@ -160,6 +161,8 @@ const REMOTE_DOWNLOAD_UPDATE_REQUIRED_MESSAGE =
 
 type RemoteFileDownloadArgs = NonNullable<ReturnType<typeof getRemoteFileArgs>>
 type RuntimeFileMutationTarget = { kind: 'environment'; environmentId: string }
+
+type RuntimeImportProgressCallback = (progress: FileUploadProgressUpdate) => void
 
 async function assertRuntimeFileMutationCapability(
   target: RuntimeFileMutationTarget,
@@ -648,7 +651,12 @@ export async function importExternalPathsToRuntime(
   context: RuntimeFileOperationArgs,
   sourcePaths: string[],
   destinationDir: string,
-  options?: { ensureDestinationDir?: boolean; assertCurrent?: () => void }
+  options?: {
+    ensureDestinationDir?: boolean
+    assertCurrent?: () => void
+    onProgress?: RuntimeImportProgressCallback
+    progressId?: string
+  }
 ): Promise<{ results: RuntimeImportResult[] }> {
   const target = getActiveRuntimeTarget(context.settings)
   if (target.kind !== 'environment' || !context.worktreeId || !context.worktreePath) {
@@ -657,7 +665,8 @@ export async function importExternalPathsToRuntime(
         sourcePaths,
         destDir: destinationDir,
         connectionId: context.connectionId,
-        ensureDir: options?.ensureDestinationDir
+        ensureDir: options?.ensureDestinationDir,
+        ...(options?.progressId ? { progressId: options.progressId } : {})
       })
     )
   }
@@ -677,7 +686,10 @@ export async function importExternalPathsToRuntime(
   )
   await assertRuntimeFileMutationCapability(target, expectedEnvironmentPairingRevision)
   assertImportSessionCurrent()
+  const progress = new RuntimeImportProgress(options?.onProgress)
+  progress.emitScanning()
   const staged = await window.api.fs.stageExternalPathsForRuntimeUpload({ sourcePaths })
+  progress.setBudget(staged.sources as StagedRuntimeImportSource[])
   assertImportSessionCurrent()
   const results: RuntimeImportResult[] = []
   const reservedNames = new Set<string>()
@@ -724,6 +736,8 @@ export async function importExternalPathsToRuntime(
           }
           continue
         }
+        const byteLength = getStagedEntryByteLength(entry)
+        progress.startFile(entryRelativePath, byteLength)
         await uploadRuntimeFileWithoutClobber(
           target,
           context.worktreeId,
@@ -736,8 +750,10 @@ export async function importExternalPathsToRuntime(
             (context.expectedSshTargetId
               ? `ssh:${encodeURIComponent(context.expectedSshTargetId)}`
               : 'local'),
-          expectedEnvironmentPairingRevision
+          expectedEnvironmentPairingRevision,
+          (bytesTransferred) => progress.updateFile(bytesTransferred)
         )
+        progress.completeFile()
       }
       reservedNames.add(finalName)
       results.push({
@@ -764,6 +780,7 @@ export async function importExternalPathsToRuntime(
           expectedEnvironmentPairingRevision
         ).catch(() => {})
       }
+      progress.clearCurrentFile()
       results.push({
         sourcePath: source.sourcePath,
         status: 'failed',
@@ -772,7 +789,105 @@ export async function importExternalPathsToRuntime(
     }
   }
 
+  progress.emitComplete()
   return { results }
+}
+
+class RuntimeImportProgress {
+  private completedFiles = 0
+  private currentFile: string | undefined
+  private currentFileBytesTotal = 0
+  private currentFileBytesTransferred = 0
+  private totalBytes = 0
+  private totalFiles = 0
+  private transferredBytesCompleted = 0
+
+  constructor(private readonly onProgress?: RuntimeImportProgressCallback) {}
+
+  emitScanning(): void {
+    this.emit('scanning')
+  }
+
+  setBudget(sources: StagedRuntimeImportSource[]): void {
+    this.totalBytes = 0
+    this.totalFiles = 0
+    for (const source of sources) {
+      if (source.status !== 'staged') {
+        continue
+      }
+      for (const entry of source.entries) {
+        if (entry.kind === 'file') {
+          this.totalFiles += 1
+          this.totalBytes += getStagedEntryByteLength(entry)
+        }
+      }
+    }
+    this.emit('scanning')
+  }
+
+  startFile(filePath: string, byteLength: number): void {
+    this.currentFile = filePath
+    this.currentFileBytesTotal = Math.max(0, byteLength)
+    this.currentFileBytesTransferred = 0
+    this.emit('uploading')
+  }
+
+  updateFile(bytesTransferred: number): void {
+    this.currentFileBytesTransferred = Math.max(
+      this.currentFileBytesTransferred,
+      Math.min(Math.max(0, bytesTransferred), this.currentFileBytesTotal)
+    )
+    this.emit('uploading')
+  }
+
+  completeFile(): void {
+    this.currentFileBytesTransferred = this.currentFileBytesTotal
+    this.completedFiles += 1
+    this.emit('uploading')
+    this.transferredBytesCompleted += this.currentFileBytesTotal
+    this.currentFile = undefined
+    this.currentFileBytesTotal = 0
+    this.currentFileBytesTransferred = 0
+  }
+
+  clearCurrentFile(): void {
+    this.currentFile = undefined
+    this.currentFileBytesTotal = 0
+    this.currentFileBytesTransferred = 0
+  }
+
+  emitComplete(): void {
+    this.emit('complete')
+  }
+
+  private emit(phase: FileUploadProgressUpdate['phase']): void {
+    this.onProgress?.({
+      phase,
+      completedFiles: this.completedFiles,
+      totalFiles: this.totalFiles,
+      transferredBytes: Math.min(
+        this.totalBytes,
+        this.transferredBytesCompleted + this.currentFileBytesTransferred
+      ),
+      totalBytes: this.totalBytes,
+      ...(this.currentFile ? { currentFile: this.currentFile } : {}),
+      ...(this.currentFile
+        ? {
+            currentFileBytesTransferred: this.currentFileBytesTransferred,
+            currentFileBytesTotal: this.currentFileBytesTotal
+          }
+        : {})
+    })
+  }
+}
+
+function getStagedEntryByteLength(entry: StagedRuntimeImportEntry): number {
+  return entry.kind === 'file' ? getBase64DecodedByteLength(entry.contentBase64) : 0
+}
+
+function getBase64DecodedByteLength(contentBase64: string): number {
+  const padding = contentBase64.endsWith('==') ? 2 : contentBase64.endsWith('=') ? 1 : 0
+  return Math.max(0, Math.floor((contentBase64.length * 3) / 4) - padding)
 }
 
 async function uploadRuntimeFileWithoutClobber(
@@ -784,7 +899,8 @@ async function uploadRuntimeFileWithoutClobber(
   expectedSshConnectionGeneration?: number,
   expectedSshTargetId?: string,
   expectedExecutionHostId?: 'local' | `ssh:${string}`,
-  expectedEnvironmentPairingRevision?: number
+  expectedEnvironmentPairingRevision?: number,
+  onProgress?: (bytesTransferred: number) => void
 ): Promise<void> {
   const tempRelativePath = makeRuntimeUploadTempPath(relativePath)
   try {
@@ -797,7 +913,8 @@ async function uploadRuntimeFileWithoutClobber(
       expectedSshConnectionGeneration,
       expectedSshTargetId,
       expectedExecutionHostId,
-      expectedEnvironmentPairingRevision
+      expectedEnvironmentPairingRevision,
+      onProgress
     )
     assertCurrent?.()
     await callRuntimeFileMutation(
@@ -842,7 +959,8 @@ async function writeRuntimeBase64File(
   expectedSshConnectionGeneration?: number,
   expectedSshTargetId?: string,
   expectedExecutionHostId?: 'local' | `ssh:${string}`,
-  expectedEnvironmentPairingRevision?: number
+  expectedEnvironmentPairingRevision?: number,
+  onProgress?: (bytesTransferred: number) => void
 ): Promise<void> {
   if (contentBase64.length <= REMOTE_UPLOAD_BASE64_CHUNK_CHARS) {
     assertCurrent?.()
@@ -860,10 +978,13 @@ async function writeRuntimeBase64File(
       30_000,
       expectedEnvironmentPairingRevision
     )
+    onProgress?.(getBase64DecodedByteLength(contentBase64))
     return
   }
 
+  let uploadedBase64Chars = 0
   for (let offset = 0; offset < contentBase64.length; offset += REMOTE_UPLOAD_BASE64_CHUNK_CHARS) {
+    const chunk = contentBase64.slice(offset, offset + REMOTE_UPLOAD_BASE64_CHUNK_CHARS)
     assertCurrent?.()
     await callRuntimeFileMutation(
       target,
@@ -871,7 +992,7 @@ async function writeRuntimeBase64File(
       {
         worktree: toRuntimeWorktreeSelector(worktreeId),
         relativePath,
-        contentBase64: contentBase64.slice(offset, offset + REMOTE_UPLOAD_BASE64_CHUNK_CHARS),
+        contentBase64: chunk,
         append: offset > 0,
         expectedSshTargetId,
         expectedSshConnectionGeneration,
@@ -880,6 +1001,8 @@ async function writeRuntimeBase64File(
       30_000,
       expectedEnvironmentPairingRevision
     )
+    uploadedBase64Chars += chunk.length
+    onProgress?.(getBase64DecodedByteLength(contentBase64.slice(0, uploadedBase64Chars)))
   }
 }
 

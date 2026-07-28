@@ -10,6 +10,7 @@ import {
   spawnSystemSsh,
   spawnSystemSshCommand,
   downloadFileViaSystemSsh,
+  readFileChunkViaSystemSsh,
   uploadDirectoryViaSystemSsh,
   uploadFileViaSystemSsh,
   writeBufferViaSystemSsh,
@@ -499,6 +500,28 @@ export class SshConnection {
     })
   }
 
+  async readFileChunk(
+    remotePath: string,
+    offset: number,
+    length: number,
+    options?: SshRemoteFileOptions
+  ): Promise<Buffer> {
+    if (!this.useSystemSshTransport) {
+      const sftp = await this.sftp()
+      try {
+        const { readFileChunkViaSftp } = await import('../providers/ssh-filesystem-provider-sftp')
+        return await readFileChunkViaSftp(sftp, remotePath, offset, length)
+      } finally {
+        sftp.end()
+      }
+    }
+    return readFileChunkViaSystemSsh(this.target, remotePath, offset, length, {
+      signal: this.systemOperationAbortController.signal,
+      hostPlatform: options?.hostPlatform,
+      ...this.getSystemSshBuildArgsOptions()
+    })
+  }
+
   async openFileUploadSession(options?: SshRemoteFileOptions): Promise<FileUploadSession> {
     if (!this.useSystemSshTransport) {
       const sftp = await this.sftp()
@@ -518,6 +541,7 @@ export class SshConnection {
           signal,
           hostPlatform: options?.hostPlatform,
           exclusive: uploadOptions?.exclusive,
+          onProgress: uploadOptions?.onProgress,
           ...buildArgsOptions
         }),
       close: () => {}

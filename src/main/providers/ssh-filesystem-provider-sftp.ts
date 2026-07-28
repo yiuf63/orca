@@ -113,3 +113,43 @@ export function statViaSftp(
 ): Promise<Stats> {
   return waitForSftpCallback<Stats>((callback) => sftp.stat(filePath, callback), options)
 }
+
+export function readFileChunkViaSftp(
+  sftp: SFTPWrapper,
+  filePath: string,
+  offset: number,
+  length: number
+): Promise<Buffer> {
+  if (length <= 0) {
+    return Promise.resolve(Buffer.alloc(0))
+  }
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    let settled = false
+    const stream = sftp.createReadStream(filePath, {
+      start: offset,
+      end: offset + length - 1
+    })
+    const cleanup = (): void => {
+      stream.off('data', onData)
+      stream.off('end', onEnd)
+      stream.off('error', onError)
+    }
+    const settle = (fn: typeof resolve | typeof reject, value: Buffer | Error): void => {
+      if (settled) {
+        return
+      }
+      settled = true
+      cleanup()
+      fn(value as never)
+    }
+    const onData = (chunk: Buffer): void => {
+      chunks.push(Buffer.from(chunk))
+    }
+    const onEnd = (): void => settle(resolve, Buffer.concat(chunks))
+    const onError = (error: Error): void => settle(reject, error)
+    stream.on('data', onData)
+    stream.on('end', onEnd)
+    stream.on('error', onError)
+  })
+}

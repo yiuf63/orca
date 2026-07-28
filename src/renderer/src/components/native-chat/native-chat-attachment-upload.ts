@@ -8,6 +8,7 @@ import { translate } from '@/i18n/i18n'
 import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import { getConnectionIdFromState } from '@/lib/connection-context'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { createFileUploadProgressToast } from '@/lib/file-upload-progress-toast'
 import type { AppState } from '@/store/types'
 import { reportTerminalDropUploadSkipsAndFailures } from '../terminal-pane/terminal-drop-upload-report'
 import {
@@ -97,18 +98,17 @@ export async function uploadNativeChatAttachmentPaths(
   paths: string[],
   owner: NativeChatSshAttachmentOwner
 ): Promise<string[] | null> {
-  const pending = toast.loading(
-    translate(
-      'components.native-chat.composer.uploadingAttachments',
-      'Uploading {{value0}} file(s) to remote…',
-      { value0: paths.length }
-    )
-  )
+  const progressToast = createFileUploadProgressToast({
+    fileCount: paths.length,
+    targetLabel: 'remote'
+  })
+  const unsubscribeProgress = progressToast.subscribe()
   try {
     const { resolvedPaths, skipped, failed } = await window.api.fs.resolveDroppedPathsForAgent({
       paths,
       worktreePath: owner.worktreePath,
       connectionId: owner.connectionId,
+      progressId: progressToast.progressId,
       expectedExecutionHostId: owner.expectedExecutionHostId,
       expectedSshTargetId: owner.expectedSshTargetId,
       expectedSshConnectionGeneration: owner.expectedSshConnectionGeneration
@@ -119,6 +119,7 @@ export async function uploadNativeChatAttachmentPaths(
     toast.error(extractIpcErrorMessage(err, 'Failed to upload files.'))
     return null
   } finally {
-    toast.dismiss(pending)
+    unsubscribeProgress()
+    progressToast.dismiss()
   }
 }

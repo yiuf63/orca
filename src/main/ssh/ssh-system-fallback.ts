@@ -7,6 +7,7 @@ export {
 export { spawnSystemSsh, spawnSystemSshCommand, type SystemSshProcess } from './system-ssh-command'
 export {
   downloadFileViaSystemSsh,
+  readFileChunkViaSystemSsh,
   uploadFileViaSystemSsh,
   writeBufferViaSystemSsh
 } from './system-ssh-file-binary-transfer'

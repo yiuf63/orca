@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Why: filesystem mutation IPC handlers stay centralized so
 authorization, SSH routing, and external import behavior remain audited together. */
-import { ipcMain } from 'electron'
+import { ipcMain, type WebContents } from 'electron'
 import { constants } from 'node:fs'
 import {
   copyFile,
@@ -23,6 +23,7 @@ import { importExternalPathsSsh } from './filesystem-import-ssh'
 import type { SshMutationExpectation } from '../../shared/ssh-types'
 import { assertSshMutationExpectation } from '../ssh/ssh-connection-generation'
 import { renameLocalPathSerializedByDestination } from '../destination-serialized-local-rename'
+import type { FileUploadProgressEvent } from '../../shared/file-upload-progress'
 
 /**
  * Re-throw filesystem errors with user-friendly messages.
@@ -191,6 +192,7 @@ export function registerFilesystemMutationHandlers(store: Store): void {
         destDir: string
         connectionId?: string
         ensureDir?: boolean
+        progressId?: string
       } & SshMutationExpectation
     ): Promise<{ results: ImportItemResult[] }> => {
       assertSshMutationExpectation(
@@ -202,6 +204,9 @@ export function registerFilesystemMutationHandlers(store: Store): void {
       if (args.connectionId) {
         return importExternalPathsSsh(args.sourcePaths, args.destDir, args.connectionId, {
           ensureDir: args.ensureDir,
+          onProgress: args.progressId
+            ? createUploadProgressEmitter(_event.sender, args.progressId)
+            : undefined,
           assertCurrent: () =>
             assertSshMutationExpectation(
               args.connectionId,
@@ -261,6 +266,7 @@ export function registerFilesystemMutationHandlers(store: Store): void {
         paths: string[]
         worktreePath: string
         connectionId?: string
+        progressId?: string
       } & SshMutationExpectation
     ): Promise<ResolveDroppedPathsResult> => {
       assertSshMutationExpectation(
@@ -282,6 +288,9 @@ export function registerFilesystemMutationHandlers(store: Store): void {
       const destDir = `${worktreePath}/.orca/drops`
       const { results } = await importExternalPathsSsh(args.paths, destDir, args.connectionId, {
         ensureDir: true,
+        onProgress: args.progressId
+          ? createUploadProgressEmitter(_event.sender, args.progressId)
+          : undefined,
         assertCurrent: () =>
           assertSshMutationExpectation(
             args.connectionId,
@@ -306,6 +315,18 @@ export function registerFilesystemMutationHandlers(store: Store): void {
       return { resolvedPaths, skipped, failed }
     }
   )
+}
+
+function createUploadProgressEmitter(
+  sender: WebContents,
+  progressId: string | undefined
+): ((progress: Omit<FileUploadProgressEvent, 'progressId'>) => void) | undefined {
+  if (!progressId) {
+    return undefined
+  }
+  return (progress) => {
+    sender.send('fs:uploadProgress', { progressId, ...progress } satisfies FileUploadProgressEvent)
+  }
 }
 
 export type ImportSkipReason = 'missing' | 'symlink' | 'permission-denied' | 'unsupported'

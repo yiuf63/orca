@@ -3,6 +3,10 @@ import { toast } from 'sonner'
 import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import { importExternalPathsToRuntime } from '@/runtime/runtime-file-client'
 import { translate } from '@/i18n/i18n'
+import {
+  createFileUploadProgressToast,
+  type FileUploadProgressToast
+} from '@/lib/file-upload-progress-toast'
 import type { FileExplorerOperationOwner } from './file-explorer-types'
 import { captureFileExplorerOperationGuard } from './file-explorer-operation-owner'
 
@@ -65,22 +69,41 @@ export function useFileExplorerImport({
       const { paths, destinationDir } = data
 
       void (async () => {
+        let progressToast: FileUploadProgressToast | null = null
+        let unsubscribeProgress = (): void => {}
         try {
           const operationGuard = captureFileExplorerOperationGuard(wtId, operationOwnerRef.current)
+          const operationRoute = operationGuard.route
+          const targetLabel = operationRoute.settings.activeRuntimeEnvironmentId
+            ? 'runtime'
+            : operationRoute.connectionId
+              ? 'remote'
+              : null
+          if (targetLabel) {
+            progressToast = createFileUploadProgressToast({
+              fileCount: paths.length,
+              targetLabel
+            })
+            unsubscribeProgress = progressToast.subscribe()
+          }
           operationGuard.assertCurrent()
           const { results } = await importExternalPathsToRuntime(
             {
-              settings: operationGuard.route.settings,
+              settings: operationRoute.settings,
               worktreeId: wtId,
               worktreePath: worktreePathRef.current,
-              connectionId: operationGuard.route.connectionId,
-              expectedExecutionHostId: operationGuard.route.expectedExecutionHostId,
-              expectedSshTargetId: operationGuard.route.expectedSshTargetId,
-              expectedSshConnectionGeneration: operationGuard.route.expectedSshConnectionGeneration
+              connectionId: operationRoute.connectionId,
+              expectedExecutionHostId: operationRoute.expectedExecutionHostId,
+              expectedSshTargetId: operationRoute.expectedSshTargetId,
+              expectedSshConnectionGeneration: operationRoute.expectedSshConnectionGeneration
             },
             paths,
             destinationDir,
-            { assertCurrent: operationGuard.assertCurrent }
+            {
+              assertCurrent: operationGuard.assertCurrent,
+              onProgress: progressToast?.update,
+              progressId: progressToast?.progressId
+            }
           )
 
           // Refresh the destination directory once per gesture
@@ -119,6 +142,8 @@ export function useFileExplorerImport({
         } catch (err) {
           toast.error(extractIpcErrorMessage(err, 'Failed to import files.'))
         } finally {
+          unsubscribeProgress()
+          progressToast?.dismiss()
           clearNativeDragStateRef.current()
         }
       })()

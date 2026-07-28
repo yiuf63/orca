@@ -23,6 +23,7 @@ import { resolveNativeTerminalDropPane } from './terminal-drop-pane-resolution'
 import { getTerminalPasteSshRemotePlatform } from './terminal-paste-ssh-platform'
 import { showTerminalDropWriteFailure } from './terminal-drop-write-failure'
 import { captureDirectSshMutationExpectation } from '@/lib/ssh-mutation-expectation'
+import { createFileUploadProgressToast } from '@/lib/file-upload-progress-toast'
 import {
   joinRuntimeTerminalDropDir,
   resolveTerminalDropWorktreePath
@@ -178,13 +179,10 @@ async function uploadRuntimeDropPaths(
 ): Promise<void> {
   const targetShell = getTerminalTargetShellForWorktreePath(args.worktreePath)
   const destinationDir = joinRuntimeTerminalDropDir(args.worktreePath)
-  const pending = toast.loading(
-    translate(
-      'auto.components.terminal.pane.terminal.drop.handler.29c031b49a',
-      'Uploading {{value0}} file{{value1}} to runtime…',
-      { value0: args.dataPaths.length, value1: args.dataPaths.length === 1 ? '' : 's' }
-    )
-  )
+  const progressToast = createFileUploadProgressToast({
+    fileCount: args.dataPaths.length,
+    targetLabel: 'runtime'
+  })
   try {
     const { results } = await importExternalPathsToRuntime(
       {
@@ -199,7 +197,7 @@ async function uploadRuntimeDropPaths(
       },
       args.dataPaths,
       destinationDir,
-      { assertCurrent: args.assertCurrent }
+      { assertCurrent: args.assertCurrent, onProgress: progressToast.update }
     )
     const imported = results.filter((result) => result.status === 'imported')
     const importedPaths = imported.map((result) =>
@@ -215,7 +213,7 @@ async function uploadRuntimeDropPaths(
   } catch (err) {
     toast.error(extractIpcErrorMessage(err, 'Failed to upload files.'))
   } finally {
-    toast.dismiss(pending)
+    progressToast.dismiss()
   }
 }
 
@@ -250,18 +248,17 @@ async function pasteLocalDropPaths(
 async function uploadRemoteDropPaths(
   args: NativeDropFlowArgs & { connectionId: string; targetShell: 'posix' | 'windows' }
 ): Promise<void> {
-  const pending = toast.loading(
-    translate(
-      'auto.components.terminal.pane.terminal.drop.handler.29c031b49a',
-      'Uploading {{value0}} file{{value1}} to remote…',
-      { value0: args.dataPaths.length, value1: args.dataPaths.length === 1 ? '' : 's' }
-    )
-  )
+  const progressToast = createFileUploadProgressToast({
+    fileCount: args.dataPaths.length,
+    targetLabel: 'remote'
+  })
+  const unsubscribeProgress = progressToast.subscribe()
   try {
     const { resolvedPaths, skipped, failed } = await window.api.fs.resolveDroppedPathsForAgent({
       paths: args.dataPaths,
       worktreePath: args.worktreePath,
       connectionId: args.connectionId,
+      progressId: progressToast.progressId,
       expectedExecutionHostId: args.expectedExecutionHostId,
       expectedSshTargetId: args.expectedSshTargetId,
       expectedSshConnectionGeneration: args.expectedSshConnectionGeneration
@@ -271,7 +268,8 @@ async function uploadRemoteDropPaths(
   } catch (err) {
     toast.error(extractIpcErrorMessage(err, 'Failed to upload files.'))
   } finally {
-    toast.dismiss(pending)
+    unsubscribeProgress()
+    progressToast.dismiss()
   }
 }
 

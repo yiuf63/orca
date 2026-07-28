@@ -171,6 +171,20 @@ describe('sftp-upload', () => {
     }
   })
 
+  it('reports bytes read while uploading a file', async () => {
+    const localDir = await mkdtemp(join(tmpdir(), 'orca-sftp-upload-'))
+    const localFile = join(localDir, 'asset.txt')
+    await writeFile(localFile, 'abcdef')
+    const sftp = createSftpMock()
+    const progress: number[] = []
+
+    await uploadFile(sftp, localFile, '/remote/asset.txt', {
+      onProgress: ({ bytesTransferred }) => progress.push(bytesTransferred)
+    })
+
+    expect(progress.at(-1)).toBe(6)
+  })
+
   it('removes remote directory contents before removing the directory', async () => {
     const sftp = createSftpMock()
     vi.mocked(sftp.readdir).mockImplementation((remotePath, cb) => {

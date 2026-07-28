@@ -1425,7 +1425,14 @@ export class RuntimeFileCommands {
         throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       const fileStats = await provider.stat(target.path)
-      if (fileStats.size > RUNTIME_PREVIEWABLE_BINARY_MAX_BYTES) {
+      const mimeType = RUNTIME_PREVIEWABLE_BINARY_MIME_TYPES[extname(target.path).toLowerCase()]
+      if (mimeType) {
+        if (fileStats.size > RUNTIME_PREVIEWABLE_BINARY_MAX_BYTES) {
+          throw new Error('file_too_large')
+        }
+        return await provider.readFile(target.path)
+      }
+      if (fileStats.size > MOBILE_FILE_READ_MAX_BYTES) {
         throw new Error('file_too_large')
       }
       const result = await provider.readFile(target.path)
@@ -1474,7 +1481,15 @@ export class RuntimeFileCommands {
       if (fileStat.type === 'directory') {
         throw new Error('Cannot download a directory')
       }
-      throw new Error('SSH runtime chunked download is unavailable; use the SSH download path')
+      if (!provider.readFileChunk) {
+        throw new Error('Remote chunked file reads are unavailable. Reconnect the SSH target.')
+      }
+      const chunk = await provider.readFileChunk(target.path, offset, length)
+      return {
+        contentBase64: chunk.toString('base64'),
+        bytesRead: chunk.byteLength,
+        eof: offset + chunk.byteLength >= fileStat.size
+      }
     }
 
     const filePath = await resolveAuthorizedPath(target.path, this.host.requireStore())
