@@ -153,6 +153,12 @@ type ActivityTerminalPortalDomStatus = {
 
 type ActivityTerminalPortalSlotId = 'primary' | 'secondary'
 
+type ActivityAgentContext = {
+  worktree: Worktree
+  repo: Repo | null
+  tab: TerminalTab
+}
+
 const ACTIVITY_TERMINAL_LOADING_LABEL_DELAY_MS = 180
 const ACTIVITY_THREAD_RESPONSE_RENDER_PREVIEW_MAX_LENGTH = 320
 const ACTIVITY_STATUS_GROUP_ORDER: ActivityStatusGroupId[] = [
@@ -511,6 +517,74 @@ function standaloneActivityWorktree(worktreeId: string): Worktree {
   }
 }
 
+function makeActivityFallbackTab(entry: AgentStatusEntry, worktreeId: string): TerminalTab {
+  const parsed = parsePaneKey(entry.paneKey)
+  const tabId = entry.tabId ?? parsed?.tabId ?? entry.paneKey
+  return {
+    id: tabId,
+    ptyId: null,
+    worktreeId,
+    title: entry.terminalTitle ?? 'Agent',
+    customTitle: null,
+    color: null,
+    sortOrder: 0,
+    createdAt: entry.stateHistory[0]?.startedAt ?? entry.stateStartedAt
+  }
+}
+
+function resolveActivityAgentContext(args: {
+  entry: AgentStatusEntry
+  tabsByWorktree: Record<string, TerminalTab[]>
+  tabContextByTabId: Map<string, ActivityAgentContext>
+  worktreeMap: Map<string, Worktree>
+  repoMap: Map<string, Repo>
+}): ActivityAgentContext | null {
+  const parsed = parsePaneKey(args.entry.paneKey)
+  const candidateTabIds = [args.entry.tabId, parsed?.tabId].filter(
+    (id): id is string => typeof id === 'string' && id.length > 0
+  )
+  for (const tabId of candidateTabIds) {
+    const context = args.tabContextByTabId.get(tabId)
+    if (context) {
+      return context
+    }
+  }
+
+  const worktreeId = args.entry.worktreeId
+  if (!worktreeId) {
+    return null
+  }
+  const worktree =
+    args.worktreeMap.get(worktreeId) ??
+    (args.tabsByWorktree[worktreeId] ? standaloneActivityWorktree(worktreeId) : null)
+  if (!worktree) {
+    return null
+  }
+  const tabs = args.tabsByWorktree[worktreeId] ?? []
+  const tab =
+    candidateTabIds.flatMap((tabId) => tabs.filter((candidate) => candidate.id === tabId))[0] ??
+    makeActivityFallbackTab(args.entry, worktreeId)
+  return {
+    worktree,
+    repo: args.repoMap.get(worktree.repoId) ?? null,
+    tab
+  }
+}
+
+function migrationUnsupportedActivityEntry(
+  unsupported: MigrationUnsupportedPtyEntry
+): AgentStatusEntry | null {
+  const entry = migrationUnsupportedToAgentStatusEntry(unsupported)
+  if (!entry) {
+    return null
+  }
+  return {
+    ...entry,
+    ...(unsupported.worktreeId ? { worktreeId: unsupported.worktreeId } : {}),
+    ...(unsupported.tabId ? { tabId: unsupported.tabId } : {})
+  }
+}
+
 // Why: per-pane cap guarantees each agent appears in the left list even when one pane has a long history.
 const EVENTS_PER_PANE_CAP = 5
 
@@ -617,22 +691,25 @@ export function buildActivityEvents(args: {
 } {
   const events: ActivityEvent[] = []
   const seenEventIds = new Set<string>()
-  const tabContext = new Map<string, { worktree: Worktree; tab: TerminalTab }>()
+  const tabContext = new Map<string, ActivityAgentContext>()
   const liveAgentByPaneKey: Record<string, ActivityLiveAgentSnapshot> = {}
 
   for (const [worktreeId, tabs] of Object.entries(args.tabsByWorktree)) {
     const worktree = args.worktreeMap.get(worktreeId) ?? standaloneActivityWorktree(worktreeId)
     for (const tab of tabs) {
-      tabContext.set(tab.id, { worktree, tab })
+      tabContext.set(tab.id, { worktree, repo: args.repoMap.get(worktree.repoId) ?? null, tab })
     }
   }
 
   for (const [paneKey, entry] of Object.entries(args.agentStatusByPaneKey)) {
-    const parsed = parsePaneKey(paneKey)
-    if (!parsed) {
-      continue
-    }
-    const context = tabContext.get(parsed.tabId)
+    const activityEntry = entry.paneKey === paneKey ? entry : { ...entry, paneKey }
+    const context = resolveActivityAgentContext({
+      entry: activityEntry,
+      tabsByWorktree: args.tabsByWorktree,
+      tabContextByTabId: tabContext,
+      worktreeMap: args.worktreeMap,
+      repoMap: args.repoMap
+    })
     if (!context) {
       continue
     }
@@ -642,37 +719,39 @@ export function buildActivityEvents(args: {
     if (liveState) {
       liveAgentByPaneKey[paneKey] = {
         state: liveState,
-        timestamp: entry.stateStartedAt,
+        timestamp: activityEntry.stateStartedAt,
         worktree: context.worktree,
-        repo: args.repoMap.get(context.worktree.repoId) ?? null,
-        entry,
+        repo: context.repo,
+        entry: activityEntry,
         tab: context.tab,
-        agentType: entry.agentType ?? 'unknown'
+        agentType: activityEntry.agentType ?? 'unknown'
       }
     }
     appendActivityEventsForEntry({
       events,
       seenEventIds,
       worktree: context.worktree,
-      repo: args.repoMap.get(context.worktree.repoId) ?? null,
-      entry,
+      repo: context.repo,
+      entry: activityEntry,
       tab: context.tab,
-      agentType: entry.agentType ?? 'unknown',
+      agentType: activityEntry.agentType ?? 'unknown',
       agentAlive: true,
       acknowledgedAt: ackAt
     })
   }
 
   for (const unsupported of Object.values(args.migrationUnsupportedByPtyId ?? {})) {
-    const entry = migrationUnsupportedToAgentStatusEntry(unsupported)
+    const entry = migrationUnsupportedActivityEntry(unsupported)
     if (!entry) {
       continue
     }
-    const parsed = parsePaneKey(entry.paneKey)
-    if (!parsed) {
-      continue
-    }
-    const context = tabContext.get(parsed.tabId)
+    const context = resolveActivityAgentContext({
+      entry,
+      tabsByWorktree: args.tabsByWorktree,
+      tabContextByTabId: tabContext,
+      worktreeMap: args.worktreeMap,
+      repoMap: args.repoMap
+    })
     if (!context) {
       continue
     }
@@ -681,7 +760,7 @@ export function buildActivityEvents(args: {
       state: 'blocked',
       timestamp: entry.stateStartedAt,
       worktree: context.worktree,
-      repo: args.repoMap.get(context.worktree.repoId) ?? null,
+      repo: context.repo,
       entry,
       tab: context.tab,
       agentType: entry.agentType ?? 'unknown'
@@ -690,7 +769,7 @@ export function buildActivityEvents(args: {
       events,
       seenEventIds,
       worktree: context.worktree,
-      repo: args.repoMap.get(context.worktree.repoId) ?? null,
+      repo: context.repo,
       entry,
       tab: context.tab,
       agentType: entry.agentType ?? 'unknown',

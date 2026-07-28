@@ -3,7 +3,8 @@ coverage in one file so status grouping stays tied to the event/thread adapter. 
 import { describe, expect, it } from 'vitest'
 import {
   AGENT_STATUS_STALE_AFTER_MS,
-  type AgentStatusEntry
+  type AgentStatusEntry,
+  type MigrationUnsupportedPtyEntry
 } from '../../../../shared/agent-status-types'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 import type { Repo, TerminalTab, Worktree } from '../../../../shared/types'
@@ -375,6 +376,78 @@ describe('buildActivityEvents', () => {
     expect(threads[0].worktree).toMatchObject({
       id: FLOATING_TERMINAL_WORKTREE_ID,
       displayName: 'Floating terminal'
+    })
+  })
+
+  it('creates a thread for an SSH-attributed live agent before its tab is locally indexed', () => {
+    const repo = { ...makeRepo(), id: 'repo-ssh', connectionId: 'ssh-target' }
+    const worktree = makeWorktreeWithId('wt-ssh', repo.id, 'ssh-feature')
+    const result = buildActivityEvents({
+      agentStatusByPaneKey: {
+        [PANE_KEY]: {
+          ...makeWorkingEntryWithoutHistory(),
+          worktreeId: worktree.id,
+          tabId: 'tab-1'
+        }
+      },
+      retainedAgentsByPaneKey: {},
+      tabsByWorktree: {},
+      worktreeMap: new Map([[worktree.id, worktree]]),
+      repoMap: new Map([[repo.id, repo]]),
+      acknowledgedAgentsByPaneKey: {},
+      now: 3_000
+    })
+
+    const threads = makeThreads(result)
+
+    expect(threads).toHaveLength(1)
+    expect(threads[0]).toMatchObject({
+      paneKey: PANE_KEY,
+      currentAgentState: 'working',
+      worktree,
+      repo,
+      tab: {
+        id: 'tab-1',
+        ptyId: null,
+        worktreeId: worktree.id
+      }
+    })
+  })
+
+  it('creates a thread for an SSH migration-unsupported agent using its worktree attribution', () => {
+    const repo = { ...makeRepo(), id: 'repo-ssh', connectionId: 'ssh-target' }
+    const worktree = makeWorktreeWithId('wt-ssh', repo.id, 'ssh-feature')
+    const unsupported: MigrationUnsupportedPtyEntry = {
+      ptyId: 'ssh:ssh-target@@pty-1',
+      worktreeId: worktree.id,
+      tabId: 'tab-1',
+      paneKey: PANE_KEY,
+      reason: 'legacy-numeric-pane-key',
+      source: 'ssh',
+      updatedAt: 4_000
+    }
+    const result = buildActivityEvents({
+      agentStatusByPaneKey: {},
+      migrationUnsupportedByPtyId: {
+        [unsupported.ptyId]: unsupported
+      },
+      retainedAgentsByPaneKey: {},
+      tabsByWorktree: {},
+      worktreeMap: new Map([[worktree.id, worktree]]),
+      repoMap: new Map([[repo.id, repo]]),
+      acknowledgedAgentsByPaneKey: {},
+      now: 4_000
+    })
+
+    const threads = makeThreads(result)
+
+    expect(threads).toHaveLength(1)
+    expect(threads[0]).toMatchObject({
+      paneKey: PANE_KEY,
+      currentAgentState: 'blocked',
+      migrationUnsupportedPtyId: unsupported.ptyId,
+      worktree,
+      repo
     })
   })
 
