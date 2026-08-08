@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { scanAiVaultSessions } from './session-scanner'
-import { getWslHomeAsync, listWslDistrosAsync } from '../wsl'
+import { getWslHomeAsync, listWslDistrosAsync, isWslPath } from '../wsl'
 import type { AiVaultListArgs, AiVaultListResult } from '../../shared/ai-vault-types'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { AiVaultScanCoordinator } from './ai-vault-scan-coordinator'
@@ -74,12 +74,17 @@ export async function listAiVaultSessions(
     start: async (scanSignal) => {
       const additionalCodexSessionsDirs =
         sources.getAdditionalCodexHomePaths?.().map((homePath) => join(homePath, 'sessions')) ?? []
+      const scopePaths = args?.scopePaths ?? []
+      const hasWslScope = scopePaths.some((p) => isWslPath(p))
+      const isPureLocalScope = scopePaths.length > 0 && !hasWslScope
+      const wslHomeDirs = isPureLocalScope ? [] : await getAiVaultWslHomeDirs()
+
       const result = await scanAiVaultSessions({
         limit: args?.limit,
         unlimited: args?.unlimited,
         scopePaths: args?.scopePaths,
         additionalCodexSessionsDirs,
-        wslHomeDirs: await getAiVaultWslHomeDirs(),
+        wslHomeDirs,
         // Cancelled/superseded callers must stop the parse, not just stop
         // waiting for it — the scan owns hundreds of transcript reads.
         signal: scanSignal,

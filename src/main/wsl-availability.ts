@@ -1,4 +1,5 @@
 import { execFile, execFileSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 
 type WslAvailabilityCache =
   | { available: true }
@@ -92,18 +93,17 @@ function cacheWslAvailabilityProbeResult(error: unknown, startedAtGeneration: nu
 
 function probeWslStatus(): Promise<void> {
   return new Promise((resolve, reject) => {
-    execFile(
-      'wsl.exe',
-      ['--status'],
-      { timeout: WSL_AVAILABILITY_PROBE_TIMEOUT_MS, windowsHide: true },
-      (error: unknown) => {
-        if (error) {
-          reject(error)
-          return
-        }
-        resolve()
-      }
-    )
+    const windir = process.env.WINDIR || 'C:\\Windows'
+    const system32Wsl = `${windir}\\System32\\wsl.exe`
+    const sysnativeWsl = `${windir}\\Sysnative\\wsl.exe`
+    if (existsSync(system32Wsl) || existsSync(sysnativeWsl)) {
+      resolve()
+    } else {
+      const error = new Error('wsl.exe not found')
+      // @ts-ignore
+      error.code = 'ENOENT'
+      reject(error)
+    }
   })
 }
 
@@ -126,13 +126,17 @@ export function isWslAvailable(): boolean {
     return false
   }
 
-  try {
-    execFileSync('wsl.exe', ['--status'], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: WSL_AVAILABILITY_PROBE_TIMEOUT_MS
-    })
+  const windir = process.env.WINDIR || 'C:\\Windows'
+  const system32Wsl = `${windir}\\System32\\wsl.exe`
+  const sysnativeWsl = `${windir}\\Sysnative\\wsl.exe`
+  const isAvailable = existsSync(system32Wsl) || existsSync(sysnativeWsl)
+
+  if (isAvailable) {
     return cacheWslAvailabilityProbeResult(null, startedAtGeneration)
-  } catch (error) {
+  } else {
+    const error = new Error('wsl.exe not found')
+    // @ts-ignore
+    error.code = 'ENOENT'
     return cacheWslAvailabilityProbeResult(error, startedAtGeneration)
   }
 }
