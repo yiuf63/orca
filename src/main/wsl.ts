@@ -216,6 +216,36 @@ export async function listWslDistrosAsync(): Promise<string[]> {
   }
 }
 
+export function listRunningWslDistros(): string[] {
+  if (process.platform !== 'win32') {
+    return []
+  }
+
+  try {
+    const output = execFileSync('wsl.exe', ['--list', '--running', '--quiet'], {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 5000
+    })
+    return filterUserWslDistros(parseWslDistros(output))
+  } catch {
+    return []
+  }
+}
+
+export async function listRunningWslDistrosAsync(): Promise<string[]> {
+  if (process.platform !== 'win32') {
+    return []
+  }
+
+  try {
+    const output = await execFileUtf8('wsl.exe', ['--list', '--running', '--quiet'])
+    return filterUserWslDistros(parseWslDistros(output))
+  } catch {
+    return []
+  }
+}
+
 export function hasCachedWslDistros(): boolean {
   return wslDistroCache !== null
 }

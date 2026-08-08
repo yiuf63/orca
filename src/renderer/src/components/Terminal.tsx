@@ -338,6 +338,7 @@ function Terminal(): React.JSX.Element | null {
   )
   const browserGuestRetentionBudgetEnabled = useAppStore(
     (s) => s.settings?.browserGuestWorktreeRetentionBudget !== false
+  )
   const autoCreateTerminalOnWorkspaceActivation = useAppStore(
     (s) => s.settings?.autoCreateTerminalOnWorkspaceActivation !== false
   )
