@@ -65,7 +65,9 @@ import {
 import { absolutePathToFileUri, resolveMarkdownLinkTarget } from './markdown-internal-links'
 import { useLocalImageSrc } from './useLocalImageSrc'
 import CodeBlockCopyButton from './CodeBlockCopyButton'
+import DotBlock from './DotBlock'
 import MermaidBlock from './MermaidBlock'
+import NomnomlBlock from './NomnomlBlock'
 import {
   applyMarkdownPreviewSearchHighlights,
   clearMarkdownPreviewSearchHighlights,
@@ -226,6 +228,12 @@ function cancelMarkdownPreviewEditorRevealFrames(frameIds: MutableRefObject<numb
     cancelAnimationFrame(frameId)
   }
   frameIds.current = []
+}
+
+function getMarkdownDiagramLanguage(className: string | undefined): string | undefined {
+  // Why: rehype-highlight prepends its own `hljs` class, so the language class
+  // is not always at the start of className.
+  return className?.match(/language-(mermaid|dot|graphviz|nomnoml)/)?.[1]
 }
 
 function clearMarkdownPreviewTimeout(timeoutRef: MutableRefObject<number | null>): void {
@@ -1760,12 +1768,19 @@ export default function MarkdownPreview({
         // Why: display uses IPC blob URLs, but Cmd/Ctrl-click opens the original target so local/SSH images use the normal file-link path.
         return <img {...props} src={resolvedSrc} alt={alt ?? ''} onClick={handleImageClick} />
       },
-      // Why: render language-mermaid blocks as SVG; opt out of Mermaid HTML labels since sanitized foreignObject labels disappear on some platforms.
-      code: ({ className, children, ...props }) => {
-        if (/language-mermaid/.test(className || '')) {
+      // Why: render diagram fenced blocks as SVG; opt out of Mermaid HTML labels since sanitized foreignObject labels disappear on some platforms.
+      code: ({ node: _node, className, children, ...props }) => {
+        const language = getMarkdownDiagramLanguage(className)
+        if (language === 'mermaid') {
           return (
             <MermaidBlock content={String(children).trimEnd()} isDark={isDark} htmlLabels={false} />
           )
+        }
+        if (language === 'dot' || language === 'graphviz') {
+          return <DotBlock content={String(children).trimEnd()} isDark={isDark} />
+        }
+        if (language === 'nomnoml') {
+          return <NomnomlBlock content={String(children).trimEnd()} isDark={isDark} />
         }
         return (
           <code className={className} {...props}>
@@ -1773,10 +1788,13 @@ export default function MarkdownPreview({
           </code>
         )
       },
-      // Why: wrap <pre> for the copy button, but pass MermaidBlock through unwrapped (it renders via innerHTML so extractText copies nothing, and <div> in <pre> is invalid HTML).
+      // Why: wrap <pre> for the copy button, but pass diagram blocks through unwrapped (they render via innerHTML so extractText copies nothing, and <div> in <pre> is invalid HTML).
       pre: ({ node, children, ...props }) => {
         const child = React.Children.toArray(children)[0]
-        if (React.isValidElement(child) && child.type === MermaidBlock) {
+        const childLanguage = React.isValidElement(child)
+          ? getMarkdownDiagramLanguage((child.props as { className?: string }).className)
+          : undefined
+        if (childLanguage) {
           return <>{children}</>
         }
         return wrapAnnotatedBlock(

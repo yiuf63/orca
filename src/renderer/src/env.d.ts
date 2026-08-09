@@ -59,6 +59,17 @@ declare module 'monaco-editor/esm/vs/base/common/lifecycle.js' {
   }
 }
 
+// viz.js ships the Emscripten Graphviz module (full.render.js) without types;
+// only the shape handed to the typed `Viz` constructor is needed here.
+declare module 'viz.js/full.render.js' {
+  export type VizFullRender = (instance: unknown, src: string, options: unknown) => string
+  const fullRender: {
+    Module: { run(): void }
+    render: VizFullRender
+  }
+  export default fullRender
+}
+
 declare global {
   var MonacoEnvironment:
     | {
