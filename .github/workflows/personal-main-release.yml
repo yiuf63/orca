@@ -23,19 +23,29 @@ jobs:
           - os: windows-latest
             args: --win --x64
             artifact: orca-windows-x64
+            globs: |
+              dist/orca-windows-setup.exe
+              dist/orca-windows-setup.exe.blockmap
           # Why: the Computer Use Swift package requires Swift 6, which only
           # ships on macOS 15 images (macos-13/14 default to Swift 5.10).
           - os: macos-15-intel
             args: --mac --x64
             artifact: orca-macos-x64
             native: true
+            globs: |
+              dist/orca-macos-x64.*
           - os: macos-15
             args: --mac --arm64
             artifact: orca-macos-arm64
             native: true
+            globs: |
+              dist/orca-macos-arm64.*
           - os: ubuntu-22.04
             args: --linux --x64
             artifact: orca-linux-x64
+            globs: |
+              dist/*.AppImage
+              dist/*.deb
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     env:
@@ -86,7 +96,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: dist/*
+          path: ${{ matrix.globs }}
           if-no-files-found: error
 
   release:
