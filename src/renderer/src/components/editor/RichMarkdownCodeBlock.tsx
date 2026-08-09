@@ -4,7 +4,9 @@ import { NodeViewContent, NodeViewWrapper } from '@tiptap/react'
 import type { NodeViewProps } from '@tiptap/react'
 import { Copy, Check } from 'lucide-react'
 import { useAppStore } from '@/store'
+import DotBlock from './DotBlock'
 import MermaidBlock from './MermaidBlock'
+import NomnomlBlock from './NomnomlBlock'
 import { translate } from '@/i18n/i18n'
 
 /**
@@ -98,6 +100,8 @@ const LANGUAGES = [
       return translate('auto.components.editor.RichMarkdownCodeBlock.89d6cc14fb', 'Mermaid')
     }
   },
+  { value: 'dot', label: 'Graphviz (DOT)' },
+  { value: 'nomnoml', label: 'Nomnoml' },
   {
     value: 'python',
     get label() {
@@ -176,7 +180,11 @@ export function RichMarkdownCodeBlock({
     settings?.theme === 'dark' ||
     (settings?.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
 
-  const isMermaid = language === 'mermaid'
+  const isDiagram =
+    language === 'mermaid' ||
+    language === 'dot' ||
+    language === 'graphviz' ||
+    language === 'nomnoml'
 
   const clearCopiedResetTimer = useCallback((): void => {
     if (copiedResetTimerRef.current !== null) {
@@ -268,14 +276,20 @@ export function RichMarkdownCodeBlock({
         )}
       </button>
       <NodeViewContent<'pre'> as="pre" />
-      {/* Why: mermaid diagrams render as a live SVG preview below the editable
+      {/* Why: diagram blocks render as a live SVG preview below the editable
           source so users can see the result while editing. The code block stays
           editable — the diagram is read-only output. This preview also goes
-          through MermaidBlock's sanitized SVG path, so it must opt out of
+          through the diagram blocks' sanitized SVG paths, so it must opt out of
           Mermaid HTML labels just like markdown preview to keep labels visible. */}
-      {isMermaid && node.textContent.trim() && (
+      {isDiagram && node.textContent.trim() && (
         <div contentEditable={false} className="mermaid-preview">
-          <MermaidBlock content={node.textContent.trim()} isDark={isDark} htmlLabels={false} />
+          {language === 'mermaid' ? (
+            <MermaidBlock content={node.textContent.trim()} isDark={isDark} htmlLabels={false} />
+          ) : language === 'dot' || language === 'graphviz' ? (
+            <DotBlock content={node.textContent.trim()} isDark={isDark} />
+          ) : (
+            <NomnomlBlock content={node.textContent.trim()} isDark={isDark} />
+          )}
         </div>
       )}
     </NodeViewWrapper>
