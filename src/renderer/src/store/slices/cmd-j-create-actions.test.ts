@@ -176,6 +176,7 @@ describe('Cmd+J lifted creation actions', () => {
     vi.stubGlobal('window', {
       api: { gh: { enqueuePRRefresh: vi.fn().mockResolvedValue(false) } }
     })
+    pairedWebFlag.__ORCA_WEB_CLIENT__ = false
 
     await store.getState().openNewBrowserTabInWorkspace('wt-1', 'group-1')
     await store.getState().openNewTerminalTabInWorkspace('wt-1', 'group-1')
