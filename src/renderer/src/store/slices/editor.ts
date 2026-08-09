@@ -105,6 +105,7 @@ import {
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { pruneTabGroupLayoutForGroups } from './tabs-hydration'
 import { sanitizeRecentTabIds } from './tab-group-state'
+import { activateAndRevealTargetWorktreeForSurface } from '@/lib/worktree-target-reveal'
 
 export type {
   ActiveRightSidebarTab,
@@ -496,6 +497,7 @@ export type EditorSlice = {
       reopenId?: string
     }
   ) => string
+  openNewMarkdownInWorkspace: (worktreeId: string, groupId: string) => Promise<void>
   openNewMarkdownInActiveWorkspace: (groupId: string) => Promise<void>
   // Why: sequences openFile/setMarkdownViewMode/reveal around an async Monaco remount. See docs/markdown-internal-link-opening-design.md.
   activateMarkdownLink: (
@@ -2000,11 +2002,16 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
   },
 
   openNewMarkdownInActiveWorkspace: async (groupId) => {
-    const state = get()
-    const worktreeId = state.activeWorktreeId
+    const worktreeId = get().activeWorktreeId
     if (!worktreeId) {
       return
     }
+    await get().openNewMarkdownInWorkspace(worktreeId, groupId)
+  },
+
+  openNewMarkdownInWorkspace: async (worktreeId, groupId) => {
+    activateAndRevealTargetWorktreeForSurface(get(), worktreeId)
+    const state = get()
     const worktree = state.getKnownWorktreeById(worktreeId)
     if (!worktree) {
       return

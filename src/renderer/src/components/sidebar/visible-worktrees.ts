@@ -20,71 +20,21 @@ import {
   getLineageRenderInfo
 } from './worktree-lineage-projection'
 import { computeRenderedSidebarWorktreeOrder } from './rendered-sidebar-worktree-order'
-import { getWorktreeGitIdentityDisplay } from '@/lib/worktree-git-identity-display'
-
-/**
- * Whether a worktree represents the repo's default-branch row that the
- * "Hide Default Branch Workspace" setting targets. Folder-mode projects are
- * main worktrees with branch === '' and are intentionally preserved.
- *
- * Why a shared helper: this predicate gates visibility in both the sidebar
- * pipeline (computeVisibleWorktreeIds) and the Cmd+J jump palette. Keeping
- * the definition in one place prevents the two surfaces from drifting.
- */
-export function isDefaultBranchWorkspace(worktree: Worktree): boolean {
-  return worktree.isMainWorktree && worktree.branch.trim() !== ''
-}
-
-/**
- * Whether the "Hide sleeping" sweep must keep this row (#8873).
- *
- * Why isMainWorktree and not isDefaultBranchWorkspace: the project's primary
- * checkout is the repo's only guaranteed entry point. Folder workspaces and
- * detached-HEAD mains fail the default-branch predicate yet often have no
- * sibling row at all, so sweeping them drops the entire project out of the
- * sidebar, Cmd+J and the board with no way back except changing a filter.
- *
- * Why shared: the sidebar pipeline and the jump palette both apply this, and a
- * second copy is how the two surfaces drift.
- */
-export function isSleepingSweepExemptWorkspace(
-  worktree: Worktree,
-  alwaysShowDefaultBranchWorkspace: boolean | undefined
-): boolean {
-  return alwaysShowDefaultBranchWorkspace !== false && worktree.isMainWorktree
-}
-
-/**
- * Whether turning the exemption off is currently narrowing the list. It only
- * bites during the "Hide sleeping" sweep, so its row — and the filter badge on
- * both menu surfaces — ignores it while sleeping workspaces are shown.
- */
-export function isSleepingSweepExemptionNarrowingList(
-  showSleepingWorkspaces: boolean,
-  alwaysShowDefaultBranchWorkspace: boolean | undefined
-): boolean {
-  return !showSleepingWorkspaces && alwaysShowDefaultBranchWorkspace === false
-}
-
-export function isAutomationGeneratedWorkspace(worktree: Worktree): boolean {
-  return worktree.automationProvenance?.kind === 'created-by-automation'
-}
-
-export function isCliCreatedWorkspace(worktree: Worktree): boolean {
-  return worktree.cliProvenance?.kind === 'created-by-cli'
-}
-
-/**
- * Whether a worktree sits on a detached HEAD (a commit, not a branch).
- *
- * Why the head check: folder workspaces and SSH-synthesized rows carry both an
- * empty branch and an empty head, so branch-emptiness alone would sweep them
- * into this filter. Requiring a real head keeps the predicate to genuine
- * detached-HEAD checkouts, matching what DetachedHeadBadge renders on the card.
- */
-export function isDetachedHeadWorkspace(worktree: Worktree): boolean {
-  return getWorktreeGitIdentityDisplay(worktree)?.kind === 'detached'
-}
+import {
+  isAutomationGeneratedWorkspace,
+  isCliCreatedWorkspace,
+  isDefaultBranchWorkspace,
+  isDetachedHeadWorkspace,
+  isSleepingSweepExemptWorkspace
+} from '@/lib/worktree-sidebar-filter-predicates'
+export {
+  isAutomationGeneratedWorkspace,
+  isCliCreatedWorkspace,
+  isDefaultBranchWorkspace,
+  isDetachedHeadWorkspace,
+  isSleepingSweepExemptWorkspace,
+  isSleepingSweepExemptionNarrowingList
+} from '@/lib/worktree-sidebar-filter-predicates'
 
 /** Inputs describing sidebar filter settings that the Clear Filters path owns. */
 export type SidebarFilterState = {

@@ -44,6 +44,20 @@ function seedActiveWorkspace(store: ReturnType<typeof createTestStore>): void {
   })
 }
 
+function seedInactiveLocalWorkspace(store: ReturnType<typeof createTestStore>): void {
+  seedStore(store, {
+    activeWorktreeId: null,
+    settings: { activeRuntimeEnvironmentId: null } as AppState['settings'],
+    worktreesByRepo: {
+      [TEST_REPO.id]: [makeWorktree({ id: 'wt-1', repoId: TEST_REPO.id, hostId: 'local' })]
+    },
+    groupsByWorktree: {
+      'wt-1': [{ id: 'group-1', worktreeId: 'wt-1', activeTabId: null, tabOrder: [] }]
+    },
+    activeGroupIdByWorktree: { 'wt-1': 'group-1' }
+  })
+}
+
 describe('Cmd+J lifted creation actions', () => {
   beforeEach(() => {
     pairedWebFlag.__ORCA_WEB_CLIENT__ = true
@@ -53,6 +67,7 @@ describe('Cmd+J lifted creation actions', () => {
 
   afterEach(() => {
     delete pairedWebFlag.__ORCA_WEB_CLIENT__
+    vi.unstubAllGlobals()
   })
 
   it('does not fall back to a local browser tab when paired-web creation fails', async () => {
@@ -153,6 +168,23 @@ describe('Cmd+J lifted creation actions', () => {
       store.getState().browserTabsByWorktree[FLOATING_TERMINAL_WORKTREE_ID] ?? []
     ).toHaveLength(1)
     expect(store.getState().tabsByWorktree[FLOATING_TERMINAL_WORKTREE_ID] ?? []).toHaveLength(1)
+  })
+
+  it('creates local tabs in an explicit workspace when no workspace is active', async () => {
+    const store = createTestStore()
+    seedInactiveLocalWorkspace(store)
+    vi.stubGlobal('window', {
+      api: { gh: { enqueuePRRefresh: vi.fn().mockResolvedValue(false) } }
+    })
+
+    await store.getState().openNewBrowserTabInWorkspace('wt-1', 'group-1')
+    await store.getState().openNewTerminalTabInWorkspace('wt-1', 'group-1')
+
+    expect(createWebRuntimeSessionBrowserTabMock).not.toHaveBeenCalled()
+    expect(createWebRuntimeSessionTerminalMock).not.toHaveBeenCalled()
+    expect(store.getState().activeWorktreeId).toBe('wt-1')
+    expect(store.getState().browserTabsByWorktree['wt-1'] ?? []).toHaveLength(1)
+    expect(store.getState().tabsByWorktree['wt-1'] ?? []).toHaveLength(1)
   })
 
   it('does not fall back to a local terminal tab when paired-web creation fails', async () => {

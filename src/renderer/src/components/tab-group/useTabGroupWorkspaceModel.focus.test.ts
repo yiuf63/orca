@@ -22,6 +22,9 @@ const mocks = vi.hoisted(() => ({
   isWebRuntimeSessionActive: vi.fn(() => false),
   makePreviewFilePermanent: vi.fn(),
   openFile: vi.fn(),
+  openNewBrowserTabInWorkspace: vi.fn(),
+  openNewMarkdownInWorkspace: vi.fn(),
+  openNewTerminalTabInWorkspace: vi.fn(),
   pinFile: vi.fn(),
   recordFeatureInteraction: vi.fn(),
   setActiveBrowserTab: vi.fn(),
@@ -150,6 +153,9 @@ function resetStore(): void {
     focusGroup: mocks.focusGroup,
     makePreviewFilePermanent: mocks.makePreviewFilePermanent,
     openFile: mocks.openFile,
+    openNewBrowserTabInWorkspace: mocks.openNewBrowserTabInWorkspace,
+    openNewMarkdownInWorkspace: mocks.openNewMarkdownInWorkspace,
+    openNewTerminalTabInWorkspace: mocks.openNewTerminalTabInWorkspace,
     pinFile: mocks.pinFile,
     recordFeatureInteraction: mocks.recordFeatureInteraction,
     setActiveBrowserTab: mocks.setActiveBrowserTab,
@@ -194,6 +200,20 @@ describe('useTabGroupWorkspaceModel terminal activation focus', () => {
     expect(mocks.setActiveTab).toHaveBeenCalledWith('terminal-1')
     expect(mocks.setActiveTabType).toHaveBeenCalledWith('terminal')
     expect(mocks.focusTerminalTabSurface).toHaveBeenCalledWith('terminal-1', null)
+  })
+
+  it('creates new tabs in the owning group when the global active worktree is missing', async () => {
+    storeBox.state = { ...storeBox.state, activeWorktreeId: null }
+    const { useTabGroupWorkspaceModel } = await import('./useTabGroupWorkspaceModel')
+    const model = useTabGroupWorkspaceModel({ groupId: 'group-1', worktreeId: 'wt-1' })
+
+    model.commands.newTerminalTab()
+    model.commands.newBrowserTab()
+    await model.commands.newFileTab()
+
+    expect(mocks.openNewTerminalTabInWorkspace).toHaveBeenCalledWith('wt-1', 'group-1')
+    expect(mocks.openNewBrowserTabInWorkspace).toHaveBeenCalledWith('wt-1', 'group-1')
+    expect(mocks.openNewMarkdownInWorkspace).toHaveBeenCalledWith('wt-1', 'group-1')
   })
 
   it('falls back to a local shell when the typed remote-create outcome is unavailable', async () => {

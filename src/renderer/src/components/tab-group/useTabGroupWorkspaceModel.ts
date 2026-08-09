@@ -81,15 +81,9 @@ export function useTabGroupWorkspaceModel({
   const setActiveFile = useAppStore((state) => state.setActiveFile)
   const setActiveTabType = useAppStore((state) => state.setActiveTabType)
   const createBrowserTab = useAppStore((state) => state.createBrowserTab)
-  const openNewBrowserTabInActiveWorkspace = useAppStore(
-    (state) => state.openNewBrowserTabInActiveWorkspace
-  )
-  const openNewMarkdownInActiveWorkspace = useAppStore(
-    (state) => state.openNewMarkdownInActiveWorkspace
-  )
-  const openNewTerminalTabInActiveWorkspace = useAppStore(
-    (state) => state.openNewTerminalTabInActiveWorkspace
-  )
+  const openNewBrowserTabInWorkspace = useAppStore((state) => state.openNewBrowserTabInWorkspace)
+  const openNewMarkdownInWorkspace = useAppStore((state) => state.openNewMarkdownInWorkspace)
+  const openNewTerminalTabInWorkspace = useAppStore((state) => state.openNewTerminalTabInWorkspace)
   const closeFile = useAppStore((state) => state.closeFile)
   const makePreviewFilePermanent = useAppStore((state) => state.makePreviewFilePermanent)
   const pinFile = useAppStore((state) => state.pinFile)
@@ -585,7 +579,7 @@ export function useTabGroupWorkspaceModel({
       closeToLeft,
       createSplitGroup,
       newBrowserTab: () => {
-        void openNewBrowserTabInActiveWorkspace(groupId)
+        void openNewBrowserTabInWorkspace(worktreeId, groupId)
       },
       newSimulatorTab: worktreeState.mobileEmulatorEnabled
         ? () => {
@@ -632,10 +626,10 @@ export function useTabGroupWorkspaceModel({
       },
       // Why: target the owning group explicitly; the "+" menu can fire from an unfocused panel without updating global group focus.
       newFileTab: async () => {
-        await openNewMarkdownInActiveWorkspace(groupId)
+        await openNewMarkdownInWorkspace(worktreeId, groupId)
       },
       newTerminalTab: () => {
-        void openNewTerminalTabInActiveWorkspace(groupId)
+        void openNewTerminalTabInWorkspace(worktreeId, groupId)
       },
       newTerminalWithShell: (shellOverride: string) => {
         void (async () => {

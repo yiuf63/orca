@@ -53,7 +53,7 @@ import {
 import { toast } from 'sonner'
 import { initialAgentTabViewModeProps } from './native-chat-initial-view-mode'
 import { getConnectionId } from '@/lib/connection-context'
-import { isDetachedHeadWorkspace } from '@/components/sidebar/visible-worktrees'
+import { isDetachedHeadWorkspace } from './worktree-sidebar-filter-predicates'
 import { isNativeChatTranscriptLocalReadable } from '@/lib/native-chat-transcript-readability'
 import { seedNativeChatAppliedSessionOptions } from '@/components/native-chat/native-chat-session-option-cache'
 import type { SessionOptionValue } from '../../../shared/native-chat-session-options'

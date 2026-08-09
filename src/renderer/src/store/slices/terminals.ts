@@ -136,6 +136,10 @@ import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-co
 import type { NativeChatLaunchDraft, NativeChatLaunchPrompt } from '@/lib/native-chat-launch-prompt'
 import { resolveAgentPaneAuthorityKey } from './agent-pane-authority'
 import {
+  activateAndRevealTargetWorktreeForSurface,
+  buildSidebarFilterRevealPatchForWorktree
+} from '@/lib/worktree-target-reveal'
+import {
   addAdditionalValidWorkspaceKeys,
   type WorkspaceSessionHydrationOptions
 } from '@/lib/workspace-session-hydration-keys'
@@ -667,6 +671,7 @@ export type TerminalSlice = {
       startupCwd?: string
     }
   ) => TerminalTab
+  openNewTerminalTabInWorkspace: (worktreeId: string, groupId: string) => Promise<void>
   openNewTerminalTabInActiveWorkspace: (groupId: string) => Promise<void>
   closeTab: (
     tabId: string,
@@ -1524,11 +1529,16 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
   },
 
   openNewTerminalTabInActiveWorkspace: async (groupId) => {
-    const state = get()
-    const worktreeId = state.activeWorktreeId
+    const worktreeId = get().activeWorktreeId
     if (!worktreeId) {
       return
     }
+    await get().openNewTerminalTabInWorkspace(worktreeId, groupId)
+  },
+
+  openNewTerminalTabInWorkspace: async (worktreeId, groupId) => {
+    activateAndRevealTargetWorktreeForSurface(get(), worktreeId)
+    const state = get()
     const workspaceScope = parseWorkspaceKey(worktreeId)
     const worktreeRoute =
       worktreeId === FLOATING_TERMINAL_WORKTREE_ID || workspaceScope?.type === 'folder'
@@ -4136,7 +4146,18 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
         worktreesByRepo[repoId] = [...(worktreesByRepo[repoId] ?? []), placeholder]
       }
 
-      // Why: record restored active worktrees to avoid suppressing later real activity.
+      const activeWorktreeForFilterReveal: Worktree | null = activeWorktreeId
+        ? (Object.values(worktreesByRepo)
+            .flat()
+            .find((entry) => entry.id === activeWorktreeId) ??
+          (s.getKnownWorktreeById(activeWorktreeId) as Worktree | undefined) ??
+          null)
+        : null
+      const sidebarFilterRevealPatch = activeWorktreeForFilterReveal
+        ? buildSidebarFilterRevealPatchForWorktree(s, activeWorktreeForFilterReveal)
+        : {}
+
+      // Why: the restored-active worktree bypasses setActiveWorktree, so record it in everActivatedWorktreeIds here to keep a later re-click from re-tagging (which would suppress real activity).
       const nextEverActivated = new Set(s.everActivatedWorktreeIds)
       if (activeWorktreeId) {
         nextEverActivated.add(activeWorktreeId)
@@ -4159,6 +4180,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
         repos: runtimeSessionPlaceholders.repos,
         tabsByWorktree,
         worktreesByRepo,
+        ...sidebarFilterRevealPatch,
         // Why: restore the focus-recency map; pruning is deferred to App.tsx (post-hydration) because SSH worktrees may still be appearing in worktreesByRepo.
         lastVisitedAtByWorktreeId: session.lastVisitedAtByWorktreeId ?? {},
         defaultTerminalTabsAppliedByWorktreeId:

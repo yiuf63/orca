@@ -59,6 +59,7 @@ import {
   type WorkspaceSessionHydrationOptions
 } from '@/lib/workspace-session-hydration-keys'
 import { buildValidWorktreeIdsForSessionHydration } from './degraded-repo-worktree-validity'
+import { activateAndRevealTargetWorktreeForSurface } from '@/lib/worktree-target-reveal'
 
 type CreateBrowserTabOptions = {
   activate?: boolean
@@ -134,6 +135,7 @@ export type BrowserSlice = {
     url: string,
     options?: CreateBrowserTabOptions
   ) => BrowserWorkspace
+  openNewBrowserTabInWorkspace: (worktreeId: string, groupId: string) => Promise<void>
   openNewBrowserTabInActiveWorkspace: (groupId: string) => Promise<void>
   closeBrowserTab: (tabId: string) => void
   shutdownWorktreeBrowsers: (worktreeId: string) => Promise<void>
@@ -670,11 +672,16 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
   },
 
   openNewBrowserTabInActiveWorkspace: async (groupId) => {
-    const state = get()
-    const worktreeId = state.activeWorktreeId
+    const worktreeId = get().activeWorktreeId
     if (!worktreeId) {
       return
     }
+    await get().openNewBrowserTabInWorkspace(worktreeId, groupId)
+  },
+
+  openNewBrowserTabInWorkspace: async (worktreeId, groupId) => {
+    activateAndRevealTargetWorktreeForSurface(get(), worktreeId)
+    const state = get()
     const defaultUrl = state.browserDefaultUrl ?? 'about:blank'
     const runtimeEnvironmentId = getRuntimeEnvironmentIdForWorktree(state, worktreeId)
     if (runtimeEnvironmentId) {
