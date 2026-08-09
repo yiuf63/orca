@@ -36,7 +36,7 @@ export function resolveSkillDiscoveryTarget(
   if (process.platform !== 'win32') {
     throw new Error('WSL skill discovery is only available on Windows.')
   }
-  const homeDir = getWslHome(wslDistro, { allowBoot: true })
+  const homeDir = getWslHome(wslDistro)
   if (!homeDir) {
     throw new Error(`Could not resolve the WSL home directory for ${wslDistro}.`)
   }

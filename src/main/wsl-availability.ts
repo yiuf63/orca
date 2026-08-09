@@ -1,4 +1,3 @@
-import { execFile, execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 
 type WslAvailabilityCache =
@@ -11,10 +10,6 @@ let wslAvailableCache: WslAvailabilityCache | null = null
 let wslAvailabilityProbeInFlight: Promise<boolean> | null = null
 let wslAvailabilityCacheGeneration = 0
 
-const WSL_AVAILABILITY_PROBE_TIMEOUT_MS = 5000
-// Why: availability is a separate, blocking probe. Deliberately not a multiple of the
-// renderer's 30s capability TTL, so repeated refreshes don't land on this boundary and
-// re-probe every cycle.
 const WSL_AVAILABILITY_NEGATIVE_CACHE_TTL_MS = 45_000
 // Why: even a definitive-looking non-zero exit can be transient — wsl.exe reports one
 // while the WSL package is servicing or LxssManager is still starting — so nothing

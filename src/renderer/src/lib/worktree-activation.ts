@@ -352,7 +352,7 @@ export function activateAndRevealWorktree(
   const primaryTabId = ensureWorktreeHasInitialTerminal(
     useAppStore.getState(),
     worktreeId,
-    opts?.startup ?? (automaticCreationEnabled ? buildCreatedAgentReopenStartup(wt) : undefined),
+    opts?.startup,
     opts?.setup,
     opts?.issueCommand,
     opts?.defaultTabs,

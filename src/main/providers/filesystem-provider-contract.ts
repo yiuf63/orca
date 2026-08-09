@@ -21,6 +21,7 @@ export type FileReadResult = {
 export type IFilesystemProvider = {
   readDir(dirPath: string): Promise<DirEntry[]>
   readFile(filePath: string): Promise<FileReadResult>
+  readFileChunk?(filePath: string, offset: number, length: number): Promise<Buffer>
   readTerminalArtifact?(
     filePath: string,
     options: TerminalArtifactAccessOptions
@@ -68,7 +69,7 @@ export type FileUploadSession = {
   uploadFile(
     sourcePath: string,
     destinationPath: string,
-    options?: { exclusive?: boolean }
+    options?: { exclusive?: boolean; onProgress?: (progress: { bytesTransferred: number }) => void }
   ): Promise<void>
   close(): void
 }

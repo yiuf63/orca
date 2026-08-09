@@ -97,6 +97,9 @@ describe('activateAndRevealWorktree', () => {
       // directly rather than via closeTab — the sleeping-record purge is covered in
       // worktree-reactivation-tab-forkbomb.test.ts.
       useAppStore.setState({ tabsByWorktree: {}, activeTabIdByWorktree: {} })
+    }
+  })
+
   it('leaves an empty worktree terminal-free when automatic creation is disabled', () => {
     const worktree = makeWorktree()
     const revealWorktreeInSidebar = vi.fn()
@@ -145,13 +148,6 @@ describe('activateAndRevealWorktree', () => {
     expect(state.tabsByWorktree[worktree.id]).toBeUndefined()
     expect(state.pendingStartupByTabId).toEqual({})
     expect(revealWorktreeInSidebar).toHaveBeenCalledWith(worktree.id)
-  })
-
-  it('uses WSL launch quoting when reopening a Windows-path WSL project agent', () => {
-    const worktree = {
-      ...makeWorktree(),
-      path: 'C:\\Users\\jinwo\\repo\\feature'
-    }
   })
 
   it('does not relaunch when activating a sibling worktree the user never opened', () => {
