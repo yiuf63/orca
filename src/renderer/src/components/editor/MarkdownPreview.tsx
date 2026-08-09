@@ -65,6 +65,7 @@ import {
 import { absolutePathToFileUri, resolveMarkdownLinkTarget } from './markdown-internal-links'
 import { useLocalImageSrc } from './useLocalImageSrc'
 import CodeBlockCopyButton from './CodeBlockCopyButton'
+import MediaLightboxModal from './MediaLightboxModal'
 import DotBlock from './DotBlock'
 import MermaidBlock from './MermaidBlock'
 import NomnomlBlock from './NomnomlBlock'
@@ -547,11 +548,41 @@ type AlertConfig = {
 }
 
 const ALERT_CONFIGS: Record<string, AlertConfig> = {
-  NOTE: { type: 'note', title: 'Note', Icon: Info },
-  TIP: { type: 'tip', title: 'Tip', Icon: Lightbulb },
-  IMPORTANT: { type: 'important', title: 'Important', Icon: AlertCircle },
-  WARNING: { type: 'warning', title: 'Warning', Icon: AlertTriangle },
-  CAUTION: { type: 'caution', title: 'Caution', Icon: OctagonAlert }
+  NOTE: {
+    type: 'note',
+    get title() {
+      return translate('auto.components.editor.MarkdownPreview.alertNote', 'Note')
+    },
+    Icon: Info
+  },
+  TIP: {
+    type: 'tip',
+    get title() {
+      return translate('auto.components.editor.MarkdownPreview.alertTip', 'Tip')
+    },
+    Icon: Lightbulb
+  },
+  IMPORTANT: {
+    type: 'important',
+    get title() {
+      return translate('auto.components.editor.MarkdownPreview.alertImportant', 'Important')
+    },
+    Icon: AlertCircle
+  },
+  WARNING: {
+    type: 'warning',
+    get title() {
+      return translate('auto.components.editor.MarkdownPreview.alertWarning', 'Warning')
+    },
+    Icon: AlertTriangle
+  },
+  CAUTION: {
+    type: 'caution',
+    get title() {
+      return translate('auto.components.editor.MarkdownPreview.alertCaution', 'Caution')
+    },
+    Icon: OctagonAlert
+  }
 }
 
 function parseGitHubAlert(
@@ -638,6 +669,7 @@ export default function MarkdownPreview({
   // Bumps when ranges recompute so the active-highlight effect re-runs even when a rerender yields the same count/index.
   const [searchRevision, setSearchRevision] = useState(0)
   const [activeMatchIndex, setActiveMatchIndex] = useState(-1)
+  const [lightboxImageSrc, setLightboxImageSrc] = useState<string | null>(null)
   const isMac = navigator.userAgent.includes('Mac')
   const openFile = useAppStore((s) => s.openFile)
   const activateMarkdownLink = useAppStore((s) => s.activateMarkdownLink)
@@ -1747,6 +1779,11 @@ export default function MarkdownPreview({
         const resolvedSrc = useLocalImageSrc(src, filePath, undefined, imageRuntimeContext)
         const handleImageClick = (event: React.MouseEvent<HTMLImageElement>): void => {
           if (!isMarkdownPreviewOpenModifier(event, isMac)) {
+            if (resolvedSrc) {
+              event.preventDefault()
+              event.stopPropagation()
+              setLightboxImageSrc(resolvedSrc)
+            }
             return
           }
 
@@ -2125,6 +2162,12 @@ export default function MarkdownPreview({
           ) : null}
           <MarkdownBody content={renderedContent} components={components} />
         </div>
+        <MediaLightboxModal
+          isOpen={lightboxImageSrc !== null}
+          imageSrc={lightboxImageSrc ?? undefined}
+          title={translate('auto.components.editor.MediaLightboxModal.imageTitle', 'Image preview')}
+          onClose={() => setLightboxImageSrc(null)}
+        />
       </div>
     </div>
   )

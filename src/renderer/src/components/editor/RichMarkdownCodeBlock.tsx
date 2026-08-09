@@ -100,8 +100,18 @@ const LANGUAGES = [
       return translate('auto.components.editor.RichMarkdownCodeBlock.89d6cc14fb', 'Mermaid')
     }
   },
-  { value: 'dot', label: 'Graphviz (DOT)' },
-  { value: 'nomnoml', label: 'Nomnoml' },
+  {
+    value: 'dot',
+    get label() {
+      return translate('auto.components.editor.RichMarkdownCodeBlock.dot', 'Graphviz (DOT)')
+    }
+  },
+  {
+    value: 'nomnoml',
+    get label() {
+      return translate('auto.components.editor.RichMarkdownCodeBlock.nomnoml', 'Nomnoml')
+    }
+  },
   {
     value: 'python',
     get label() {
@@ -284,11 +294,16 @@ export function RichMarkdownCodeBlock({
       {isDiagram && node.textContent.trim() && (
         <div contentEditable={false} className="mermaid-preview">
           {language === 'mermaid' ? (
-            <MermaidBlock content={node.textContent.trim()} isDark={isDark} htmlLabels={false} />
+            <MermaidBlock
+              content={node.textContent.trim()}
+              isDark={isDark}
+              htmlLabels={false}
+              hideCopyButton
+            />
           ) : language === 'dot' || language === 'graphviz' ? (
-            <DotBlock content={node.textContent.trim()} isDark={isDark} />
+            <DotBlock content={node.textContent.trim()} isDark={isDark} hideCopyButton />
           ) : (
-            <NomnomlBlock content={node.textContent.trim()} isDark={isDark} />
+            <NomnomlBlock content={node.textContent.trim()} isDark={isDark} hideCopyButton />
           )}
         </div>
       )}

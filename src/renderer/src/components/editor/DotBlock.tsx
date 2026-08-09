@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import type Viz from 'viz.js'
 import DOMPurify from 'dompurify'
+import DiagramLightbox from './DiagramLightbox'
 import { translate } from '@/i18n/i18n'
 
 type VizApi = typeof Viz
@@ -31,15 +32,21 @@ function loadVizInstance(): Promise<InstanceType<VizApi>> {
 type DotBlockProps = {
   content: string
   isDark: boolean
+  hideCopyButton?: boolean
 }
 
 /**
  * Renders a Graphviz DOT diagram as SVG. Falls back to raw source with an
  * error banner if the syntax is invalid — never breaks the rest of the preview.
  */
-export default function DotBlock({ content, isDark }: DotBlockProps): React.JSX.Element {
+export default function DotBlock({
+  content,
+  isDark,
+  hideCopyButton = false
+}: DotBlockProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -86,5 +93,19 @@ export default function DotBlock({ content, isDark }: DotBlockProps): React.JSX.
     )
   }
 
-  return <div className={containerClassName} ref={containerRef} />
+  return (
+    <div
+      className={`${containerClassName} group relative cursor-pointer hover:ring-1 hover:ring-primary/40 rounded transition-all`}
+      onClick={() => setIsLightboxOpen(true)}
+    >
+      <div ref={containerRef} />
+      <DiagramLightbox
+        svgHtml={containerRef.current?.innerHTML}
+        sourceCode={content}
+        isOpen={isLightboxOpen}
+        onOpenChange={setIsLightboxOpen}
+        hideCopyButton={hideCopyButton}
+      />
+    </div>
+  )
 }

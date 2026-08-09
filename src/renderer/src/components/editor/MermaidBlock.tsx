@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from 'react'
 import type mermaidNamespace from 'mermaid'
 import DOMPurify from 'dompurify'
+import DiagramLightbox from './DiagramLightbox'
 import { getMermaidConfig } from './mermaid-config'
 import { translate } from '@/i18n/i18n'
 
@@ -22,6 +23,7 @@ type MermaidBlockProps = {
   content: string
   isDark: boolean
   htmlLabels?: boolean
+  hideCopyButton?: boolean
 }
 
 // Why: mermaid.render() manipulates global DOM state (element IDs, internal
@@ -50,11 +52,13 @@ function enqueueRender(fn: () => Promise<void>): void {
 export default function MermaidBlock({
   content,
   isDark,
-  htmlLabels = false
+  htmlLabels = false,
+  hideCopyButton = false
 }: MermaidBlockProps): React.JSX.Element {
   const id = useId().replace(/:/g, '_')
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -112,5 +116,19 @@ export default function MermaidBlock({
     )
   }
 
-  return <div className="mermaid-block" ref={containerRef} />
+  return (
+    <div
+      className="mermaid-block group relative cursor-pointer hover:ring-1 hover:ring-primary/40 rounded transition-all"
+      onClick={() => setIsLightboxOpen(true)}
+    >
+      <div ref={containerRef} />
+      <DiagramLightbox
+        svgHtml={containerRef.current?.innerHTML}
+        sourceCode={content}
+        isOpen={isLightboxOpen}
+        onOpenChange={setIsLightboxOpen}
+        hideCopyButton={hideCopyButton}
+      />
+    </div>
+  )
 }

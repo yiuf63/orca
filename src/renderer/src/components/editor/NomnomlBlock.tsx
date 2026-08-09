@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import type nomnomlNamespace from 'nomnoml'
 import DOMPurify from 'dompurify'
+import DiagramLightbox from './DiagramLightbox'
 import { translate } from '@/i18n/i18n'
 import { getNomnomlThemeSource } from './nomnoml-config'
 
@@ -20,15 +21,21 @@ function loadNomnoml(): Promise<NomnomlApi> {
 type NomnomlBlockProps = {
   content: string
   isDark: boolean
+  hideCopyButton?: boolean
 }
 
 /**
  * Renders a nomnoml UML diagram as SVG. Falls back to raw source with an
  * error banner if the syntax is invalid — never breaks the rest of the preview.
  */
-export default function NomnomlBlock({ content, isDark }: NomnomlBlockProps): React.JSX.Element {
+export default function NomnomlBlock({
+  content,
+  isDark,
+  hideCopyButton = false
+}: NomnomlBlockProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -73,5 +80,19 @@ export default function NomnomlBlock({ content, isDark }: NomnomlBlockProps): Re
     )
   }
 
-  return <div className="nomnoml-block" ref={containerRef} />
+  return (
+    <div
+      className="nomnoml-block group relative cursor-pointer hover:ring-1 hover:ring-primary/40 rounded transition-all"
+      onClick={() => setIsLightboxOpen(true)}
+    >
+      <div ref={containerRef} />
+      <DiagramLightbox
+        svgHtml={containerRef.current?.innerHTML}
+        sourceCode={content}
+        isOpen={isLightboxOpen}
+        onOpenChange={setIsLightboxOpen}
+        hideCopyButton={hideCopyButton}
+      />
+    </div>
+  )
 }

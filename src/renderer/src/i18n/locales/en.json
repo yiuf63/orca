@@ -13305,7 +13305,12 @@
           "d652c87c91": "Saving…",
           "c5dc92cfe3": "No results",
           "6c043947ae": "File not found: {{value0}}",
-          "759463a221": "Cannot open directory: {{value0}}"
+          "759463a221": "Cannot open directory: {{value0}}",
+          "alertNote": "Note",
+          "alertTip": "Tip",
+          "alertImportant": "Important",
+          "alertWarning": "Warning",
+          "alertCaution": "Caution"
         },
         "MarkdownTableOfContentsPanel": {
           "de3928b6e4": "No headings",
@@ -13399,7 +13404,9 @@
           "026653f21f": "CSS",
           "4daed43ae3": "C++",
           "4227cf50fe": "Bash",
-          "13822cdfda": "Plain text"
+          "13822cdfda": "Plain text",
+          "dot": "Graphviz (DOT)",
+          "nomnoml": "Nomnoml"
         },
         "RichMarkdownDocLinkMenu": {
           "e17b987473": "↑↓ navigate&nbsp;&nbsp;↵ select&nbsp;&nbsp;esc dismiss",
@@ -13713,6 +13720,26 @@
           "insertColumnRight": "Insert column right",
           "deleteRow": "Delete row",
           "deleteColumn": "Delete column"
+        },
+        "DiagramLightbox": {
+          "copied": "Copied diagram code",
+          "zoom": "Expand & Zoom"
+        },
+        "MediaLightboxModal": {
+          "imageTitle": "Image preview",
+          "copied": "Copied SVG to clipboard",
+          "copiedImg": "Copied image path to clipboard",
+          "copyFailed": "Failed to copy",
+          "downloaded": "Downloaded SVG",
+          "downloadedImg": "Downloaded image",
+          "title": "Diagram preview",
+          "copy": "Copy Diagram/Image",
+          "download": "Download Diagram/Image",
+          "zoomIn": "Zoom In",
+          "zoomOut": "Zoom Out",
+          "reset": "Reset",
+          "close": "Close",
+          "alt": "Lightbox"
         }
       },
       "diff": {
