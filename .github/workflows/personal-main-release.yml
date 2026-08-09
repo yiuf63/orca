@@ -1,4 +1,4 @@
-name: Personal Main Build & Release Artifact
+name: Personal Main Release
 
 on:
   push:
@@ -6,38 +6,120 @@ on:
       - personal/main
   workflow_dispatch: {}
 
-jobs:
-  build-windows:
-    name: Build Windows Release (.exe)
-    runs-on: windows-latest
+permissions:
+  contents: write
 
+concurrency:
+  group: personal-main-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.artifact }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: --win --x64
+            artifact: orca-windows-x64
+          - os: macos-13
+            args: --mac --x64
+            artifact: orca-macos-x64
+            native: true
+          - os: macos-14
+            args: --mac --arm64
+            artifact: orca-macos-arm64
+            native: true
+          - os: ubuntu-22.04
+            args: --linux --x64
+            artifact: orca-linux-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: package.json
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Install native build tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential python3 zlib1g-dev zsh
+
+      # Why: pnpm's bundled node-gyp ships gyp_main.py without execute
+      # permission, which breaks native module builds on Linux runners.
+      - name: Use external node-gyp to avoid pnpm's bundled copy (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          npm install -g node-gyp@11.5.0
+          echo "npm_config_node_gyp=$(npm root -g)/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false
 
-      - name: Build Desktop & Web
+      - name: Build desktop bundle
         run: pnpm run build:desktop
 
-      - name: Build Windows Installer
-        run: |
-          node config/scripts/ensure-native-runtime.mjs --runtime=electron
-          pnpm exec electron-builder --config config/electron-builder.config.cjs --win --publish never
+      # Why: macOS packaging needs the Computer Use helper app and notification
+      # status binary compiled before electron-builder runs; other platforms
+      # either use checked-in resources or a launcher built by electron-builder.
+      - name: Build native helpers
+        if: matrix.native
+        run: pnpm run build:native
 
-      - name: Upload Windows Installer Artifact
+      - name: Package
+        run: pnpm exec electron-builder --config config/electron-builder.config.cjs ${{ matrix.args }} --publish never
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Orca-Windows-Installer
-          path: |
-            dist/*.exe
-            dist/*.blockmap
+          name: ${{ matrix.artifact }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Draft GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          date="$(date +%Y%m%d)"
+          short_sha="${SHA:0:7}"
+          tag="v${version}-personal-${date}-${short_sha}"
+          notes="Personal multi-platform build from personal/main @ ${SHA}
+
+          Artifacts: Windows x64, macOS x64, macOS arm64, Linux x64.
+
+          Unsigned personal build — macOS: right-click the app and choose Open; Windows: click through SmartScreen."
+          gh release create "$tag" artifacts/* \
+            --draft \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Personal build ${date} (${short_sha})" \
+            --notes "$notes"
